@@ -682,11 +682,258 @@
     to { opacity: 1; transform: translateY(0); }
   }
   .tile { animation: fadeSlideIn 0.3s ease-out; }
+  /* ── TOUR PLANNER MODAL ──────────── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg);
+    border-radius: 16px;
+    width: 520px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+  }
+  .modal-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--forest);
+    margin: 0;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+  .modal-close:hover { background: var(--sand); }
+  .modal-body { padding: 24px; }
+  .form-group {
+    margin-bottom: 18px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: var(--body);
+    font-size: 14px;
+    background: var(--bg-tile);
+    color: var(--text);
+    box-sizing: border-box;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--copper);
+    box-shadow: 0 0 0 3px rgba(200,112,42,0.15);
+  }
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .vehicle-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .vehicle-option:hover { border-color: var(--copper); background: rgba(200,112,42,0.05); }
+  .vehicle-option.selected { border-color: var(--copper); background: rgba(200,112,42,0.1); }
+  .vehicle-option input[type="radio"] { display: none; }
+  .vehicle-icon { font-size: 24px; }
+  .vehicle-label { font-size: 13px; font-weight: 600; }
+  .vehicle-desc { font-size: 11px; color: var(--text-muted); }
+
+  .btn-generate {
+    width: 100%;
+    padding: 14px;
+    background: var(--forest);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--body);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+    margin-top: 8px;
+  }
+  .btn-generate:hover { background: #2c5a3d; transform: translateY(-1px); }
+  .btn-generate:disabled {
+    background: var(--sand);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top: 3px solid white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(250,248,244,0.92);
+    z-index: 2000;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+  }
+  .loading-overlay.active { display: flex; }
+  .loading-text {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--forest);
+  }
+  .loading-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    max-width: 300px;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .loading-spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--sand);
+    border-top: 4px solid var(--copper);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
   .tile-b { animation-delay: 0.05s; }
   .tile-c { animation-delay: 0.1s; }
 </style>
 </head>
 <body>
+
+<!-- ═══════ LOADING OVERLAY ═══════ -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">🗺️ Deine Tour wird geplant...</div>
+  <div class="loading-sub" id="loadingStatus">Claude analysiert die Route, sucht Insider-Tipps und plant deine Stopps.</div>
+</div>
+
+<!-- ═══════ TOUR PLANNER MODAL ═══════ -->
+<div class="modal-overlay" id="tourModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>✏️ Neue Tour planen</h2>
+      <button class="modal-close" onclick="closeTourModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>🟢 Startort</label>
+        <input type="text" id="tourStart" placeholder="z.B. München, Hamburg, Wien..." value="">
+      </div>
+      <div class="form-group">
+        <label>🔴 Zielort</label>
+        <input type="text" id="tourEnd" placeholder="z.B. Gardasee, Barcelona, Dubrovnik..." value="">
+      </div>
+
+      <div class="form-group">
+        <label>🚗 Fahrzeug</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="vehicle-option selected" onclick="selectVehicle(this, 'vespa')">
+            <input type="radio" name="vehicle" value="vespa" checked>
+            <div class="vehicle-icon">🛵</div>
+            <div><div class="vehicle-label">Vespa 125cc</div><div class="vehicle-desc">max 90 km/h · keine Autobahn</div></div>
+          </div>
+          <div class="vehicle-option" onclick="selectVehicle(this, 'wohnmobil')">
+            <input type="radio" name="vehicle" value="wohnmobil">
+            <div class="vehicle-icon">🚐</div>
+            <div><div class="vehicle-label">Wohnmobil</div><div class="vehicle-desc">7.20m · 4.8t · Stellplätze</div></div>
+          </div>
+          <div class="vehicle-option" onclick="selectVehicle(this, 'auto')">
+            <input type="radio" name="vehicle" value="auto">
+            <div class="vehicle-icon">🚗</div>
+            <div><div class="vehicle-label">Auto</div><div class="vehicle-desc">Flexibel · alle Straßen</div></div>
+          </div>
+          <div class="vehicle-option" onclick="selectVehicle(this, 'fahrrad')">
+            <input type="radio" name="vehicle" value="fahrrad">
+            <div class="vehicle-icon">🚲</div>
+            <div><div class="vehicle-label">Fahrrad / E-Bike</div><div class="vehicle-desc">Radwege · max 80km/Tag</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>📅 Anzahl Tage</label>
+          <select id="tourDays">
+            <option value="2">2 Tage</option>
+            <option value="3">3 Tage</option>
+            <option value="4">4 Tage</option>
+            <option value="5" selected>5 Tage</option>
+            <option value="7">7 Tage</option>
+            <option value="10">10 Tage</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>✨ Stimmung / Vibe</label>
+          <select id="tourVibe">
+            <option value="Entspannt mit Genuss – viele Pausen, gutes Essen, keine Hetze">🌿 Entspannt & Genuss</option>
+            <option value="Abenteuer – Passstraßen, Natur, Off-the-beaten-path">🏔️ Abenteuer</option>
+            <option value="Kultur & Geschichte – Museen, Altstädte, Architektur">🏛️ Kultur & Geschichte</option>
+            <option value="Sportlich – maximale Kilometer, wenig Pausen, ambitioniert">⚡ Sportlich</option>
+            <option value="Fotografie – beste Foto-Spots, Sonnenauf/untergänge, Panoramen">📸 Fotografie</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>💬 Zusätzliche Wünsche (optional)</label>
+        <textarea id="tourNotes" rows="2" placeholder="z.B. Ich mag Weingüter, vermeide Großstädte, muss in Innsbruck übernachten..."></textarea>
+      </div>
+
+      <button class="btn-generate" id="btnGenerate" onclick="generateTour()">
+        🚀 Tour generieren lassen
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════ HEADER ═══════ -->
 <div class="header">
@@ -1746,6 +1993,160 @@ function switchDay(day) {
 
 // Initial render
 switchDay(1);
+
+// ═══════ MODAL & TOUR GENERATION ═══════
+
+let selectedVehicle = 'vespa';
+
+function toggleView(view) {
+  if (view === 'form') {
+    document.getElementById('tourModal').classList.add('active');
+  }
+}
+
+function closeTourModal() {
+  document.getElementById('tourModal').classList.remove('active');
+}
+
+function selectVehicle(el, vehicle) {
+  document.querySelectorAll('.vehicle-option').forEach(v => v.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedVehicle = vehicle;
+}
+
+async function generateTour() {
+  const start = document.getElementById('tourStart').value.trim();
+  const end = document.getElementById('tourEnd').value.trim();
+  const days = document.getElementById('tourDays').value;
+  const vibe = document.getElementById('tourVibe').value;
+  const notes = document.getElementById('tourNotes').value.trim();
+
+  if (!start || !end) {
+    alert('Bitte Start und Ziel eingeben!');
+    return;
+  }
+
+  // Close modal, show loading
+  closeTourModal();
+  const overlay = document.getElementById('loadingOverlay');
+  overlay.classList.add('active');
+
+  const statusEl = document.getElementById('loadingStatus');
+  const messages = [
+    'Claude analysiert die Route...',
+    'Insider-Tipps werden recherchiert...',
+    'Streckenhinweise werden geprüft...',
+    'GPS-Koordinaten werden berechnet...',
+    'Budget wird kalkuliert...',
+    'Packliste wird zusammengestellt...',
+    'Fast fertig – Tour wird aufbereitet...'
+  ];
+  let msgIdx = 0;
+  const msgInterval = setInterval(() => {
+    msgIdx = (msgIdx + 1) % messages.length;
+    statusEl.textContent = messages[msgIdx];
+  }, 3000);
+
+  try {
+    const vibeWithNotes = notes ? `${vibe}. Zusatzwünsche: ${notes}` : vibe;
+
+    const response = await fetch('/api/plan-tour', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start, end,
+        vehicle: selectedVehicle,
+        days: parseInt(days),
+        vibe: vibeWithNotes
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'API Fehler');
+    }
+
+    const data = await response.json();
+    clearInterval(msgInterval);
+    applyGeneratedTour(data);
+
+  } catch (error) {
+    clearInterval(msgInterval);
+    overlay.classList.remove('active');
+    alert('Fehler bei der Tour-Generierung: ' + error.message);
+  }
+}
+
+function applyGeneratedTour(data) {
+  // Replace tourData with generated data
+  const dayKeys = Object.keys(data.days).map(Number).sort();
+
+  // Clear and rebuild tourData
+  for (const key in tourData) delete tourData[key];
+  dayKeys.forEach(dayNum => {
+    const d = data.days[dayNum];
+    tourData[dayNum] = d;
+  });
+
+  // Update vehicle badge
+  const vehicleNames = {
+    vespa: '🛵 Vespa 125cc · max 90 km/h · keine Autobahn',
+    wohnmobil: '🚐 Wohnmobil 7.20m · 4.8t · max 100 km/h',
+    auto: '🚗 Auto · alle Straßen · flexibel',
+    fahrrad: '🚲 Fahrrad/E-Bike · Radwege · max 80km/Tag'
+  };
+  document.querySelector('.vehicle-badge').textContent = vehicleNames[selectedVehicle] || vehicleNames.vespa;
+
+  // Rebuild day pills
+  const dayNav = document.getElementById('dayNav');
+  dayNav.innerHTML = '';
+  dayKeys.forEach((dayNum, i) => {
+    const pill = document.createElement('div');
+    pill.className = 'day-pill' + (i === 0 ? ' active' : '');
+    pill.dataset.day = dayNum;
+    pill.onclick = () => switchDay(dayNum);
+    pill.textContent = `Tag ${dayNum} · ${tourData[dayNum].title}`;
+    dayNav.appendChild(pill);
+  });
+  // Total pill
+  const totalPill = document.createElement('div');
+  totalPill.className = 'day-pill total';
+  totalPill.dataset.day = 'total';
+  totalPill.onclick = () => switchDay('total');
+  totalPill.textContent = '📊 Total';
+  dayNav.appendChild(totalPill);
+
+  // Update total view stats
+  const totalKm = data.totalKm || dayKeys.reduce((sum, d) => {
+    const meta = tourData[d].meta || '';
+    const m = meta.match(/(\d+)\s*km/);
+    return sum + (m ? parseInt(m[1]) : 0);
+  }, 0);
+  const totalBudget = data.totalBudget || dayKeys.reduce((sum, d) => {
+    const b = tourData[d].budget;
+    return sum + (b ? b.fuel + b.food + b.sleep : 0);
+  }, 0);
+  const totalStops = dayKeys.reduce((sum, d) => sum + (tourData[d].stops ? tourData[d].stops.length : 0), 0);
+
+  // Update total view if elements exist
+  const statValues = document.querySelectorAll('.stat-value');
+  if (statValues.length >= 4) {
+    statValues[0].textContent = totalKm;
+    statValues[1].textContent = dayKeys.length;
+    statValues[2].textContent = '€' + totalBudget;
+    statValues[3].textContent = totalStops;
+  }
+
+  // Update highlights
+  if (data.highlights) {
+    const highlightsContainer = document.querySelector('.total-view .tile-body');
+    // Will be handled by switchDay('total')
+  }
+
+  // Hide loading, show first day
+  document.getElementById('loadingOverlay').classList.remove('active');
+  switchDay(dayKeys[0]);
+}
 
 // ═══════ DRAG RESIZE ═══════
 // Generic drag handler for resizable panels

@@ -2,11 +2,12 @@
 
 **by rosch-lab**
 
-Intelligenter Tourenplaner für Vespa, Wohnmobil und mehr. Mit Insider-Tipps, Streckenhinweisen und echtem Mapbox-Routing.
+KI-gestützter Tourenplaner für Vespa, Wohnmobil, Auto und Fahrrad. Claude generiert Insider-Tipps, Streckenhinweise und echtes Routing.
 
 ## Features
+- 🤖 KI-Tourgenerierung via Claude API
 - 🗺️ Echte Kartenansicht mit Mapbox (Outdoor-Style)
-- 🛵 Fahrzeugspezifisches Routing (Vespa: keine Autobahn)
+- 🛵 Fahrzeugspezifisches Routing (z.B. Vespa: keine Autobahn)
 - ⚠️ Streckenhinweise: Tankreichweite, Steigungen, Maut, Temperatur
 - 💡 Insider-Tipps, Geheimtipps, Foto-Spots, Einkehr-Tipps
 - 🔗 WebLinks bei jedem Tipp (Google Maps, Wikipedia, Tripadvisor)
@@ -14,9 +15,7 @@ Intelligenter Tourenplaner für Vespa, Wohnmobil und mehr. Mit Insider-Tipps, St
 - ↔️ Verschiebbare Kacheln (Drag-Resize)
 
 ## Tech Stack
-- HTML/CSS/JS (Self-contained)
-- Mapbox GL JS 3.9 (Outdoor-v12)
-- Mapbox Directions API (exclude=motorway)
-
-## Deploy
-Hosted on Vercel. Push to main → auto-deploy.
+- Frontend: HTML/CSS/JS
+- Backend: Vercel Serverless Functions
+- KI: Claude API (Anthropic)
+- Karte: Mapbox GL JS 3.9 + Directions API
