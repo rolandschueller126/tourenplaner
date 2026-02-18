@@ -1,0 +1,1828 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tourenplaner – Dein KI Agent für feine Touren | by rosch-lab</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.js"></script>
+<style>
+  :root {
+    --bg: #faf8f4;
+    --bg-tile: #ffffff;
+    --forest: #2c3e2d;
+    --forest-light: #3d6b4f;
+    --copper: #c8702a;
+    --copper-light: #e8943e;
+    --earth: #8b6f47;
+    --sand: #d4c5a9;
+    --sand-light: #e8dcc8;
+    --warn: #e6a817;
+    --danger: #c45c4a;
+    --info: #5b8ab5;
+    --text: #2a2a2a;
+    --text-muted: #6b6b6b;
+    --text-light: #999;
+    --border: #e5e0d8;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 2px 12px rgba(44,62,45,0.08);
+    --shadow-hover: 0 4px 20px rgba(44,62,45,0.14);
+    --font: 'DM Sans', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+    /* tag colors */
+    --tag-tip: #f5e6c8;
+    --tag-tip-text: #8b6f47;
+    --tag-photo: #d4e4f5;
+    --tag-photo-text: #3a6b9f;
+    --tag-hidden: #e8d8f0;
+    --tag-hidden-text: #7b5a9e;
+    --tag-food: #fce4c8;
+    --tag-food-text: #9a6a2a;
+    --tag-nature: #d0e8d4;
+    --tag-nature-text: #3d6b4f;
+    --tag-warn: #fef3cd;
+    --tag-warn-text: #856404;
+    --tag-danger: #f8d7da;
+    --tag-danger-text: #842029;
+    --tag-fuel: #d1ecf1;
+    --tag-fuel-text: #0c5460;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ─────────────────────────── */
+  .header {
+    background: var(--forest);
+    color: white;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--copper-light); }
+  .vehicle-badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .header-right { display: flex; gap: 10px; }
+  .btn-header {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: white;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-header:hover { background: rgba(255,255,255,0.2); }
+
+  /* ── DAY PILLS ──────────────────────── */
+  .day-nav {
+    display: flex;
+    gap: 6px;
+    padding: 14px 28px;
+    background: white;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .day-pill {
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    border: 1.5px solid var(--border);
+    background: white;
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+  .day-pill:hover { border-color: var(--copper); color: var(--copper); }
+  .day-pill.active {
+    background: var(--forest);
+    color: white;
+    border-color: var(--forest);
+  }
+  .day-pill.total {
+    border-color: var(--copper);
+    color: var(--copper);
+    font-weight: 600;
+  }
+  .day-pill.total.active {
+    background: var(--copper);
+    color: white;
+    border-color: var(--copper);
+  }
+
+  /* ── TILES GRID ─────────────────────── */
+  .tiles {
+    display: flex;
+    padding: 14px 28px 28px;
+    height: calc(100vh - 120px);
+    min-height: 600px;
+    gap: 0;
+  }
+  .tiles-left {
+    display: flex;
+    flex-direction: column;
+    min-width: 280px;
+    overflow: hidden;
+  }
+  .tiles-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+    overflow: hidden;
+  }
+
+  /* Drag handles */
+  .drag-h {
+    width: 8px;
+    cursor: col-resize;
+    background: transparent;
+    position: relative;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .drag-h:hover, .drag-h.active { background: var(--copper); opacity: 0.25; border-radius: 4px; }
+  .drag-h::after {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px; height: 32px;
+    background: var(--sand); border-radius: 2px;
+  }
+  .drag-h:hover::after, .drag-h.active::after { background: var(--copper); }
+
+  .drag-v {
+    height: 8px;
+    cursor: row-resize;
+    background: transparent;
+    position: relative;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  .drag-v:hover, .drag-v.active { background: var(--copper); opacity: 0.25; border-radius: 4px; }
+  .drag-v::after {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px; height: 2px;
+    background: var(--sand); border-radius: 2px;
+  }
+  .drag-v:hover::after, .drag-v.active::after { background: var(--copper); }
+
+  .tile {
+    background: var(--bg-tile);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: box-shadow 0.2s;
+  }
+  .tile:hover { box-shadow: var(--shadow-hover); }
+
+  /* Tile A: Content/POIs */
+  .tile-a { flex: 1; overflow-y: auto; }
+  /* Tile B: Map */
+  .tile-b { flex: 1; min-height: 120px; }
+  /* Tile C: Route Hints */
+  .tile-c { flex: 1; overflow-y: auto; min-height: 120px; }
+
+  .tile-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--forest);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+  .tile-header .subtitle {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .tile-body { padding: 16px 18px; flex: 1; overflow-y: auto; }
+
+  /* ── STOP CARDS ─────────────────────── */
+  .stop-card {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .stop-card:last-child { border-bottom: none; }
+  .stop-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--forest);
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+  .stop-title {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+  }
+  .stop-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    margin-left: 36px;
+    font-family: var(--mono);
+  }
+  .stop-desc {
+    margin-top: 8px;
+    margin-left: 36px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text);
+  }
+
+  /* ── TIPS ────────────────────────────── */
+  .tips-list {
+    margin-top: 10px;
+    margin-left: 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tip {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid transparent;
+  }
+  .tip.tip-insider { border-left-color: var(--copper); }
+  .tip.tip-hidden { border-left-color: #7b5a9e; }
+  .tip.tip-photo { border-left-color: var(--info); }
+  .tip.tip-food { border-left-color: var(--copper-light); }
+  .tip.tip-nature { border-left-color: var(--forest-light); }
+
+  .tip-tag {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .tip-tag.tag-tip { background: var(--tag-tip); color: var(--tag-tip-text); }
+  .tip-tag.tag-photo { background: var(--tag-photo); color: var(--tag-photo-text); }
+  .tip-tag.tag-hidden { background: var(--tag-hidden); color: var(--tag-hidden-text); }
+  .tip-tag.tag-food { background: var(--tag-food); color: var(--tag-food-text); }
+  .tip-tag.tag-nature { background: var(--tag-nature); color: var(--tag-nature-text); }
+
+  .tip-content { flex: 1; }
+  .tip-text { margin-bottom: 4px; }
+
+  /* ── WEB LINKS (NEU!) ───────────────── */
+  .tip-links {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 5px;
+  }
+  .tip-link {
+    font-size: 10.5px;
+    font-weight: 500;
+    padding: 2px 9px;
+    border-radius: 10px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .tip-link:hover {
+    border-color: var(--copper);
+    color: var(--copper);
+    background: rgba(200,112,42,0.05);
+  }
+  .tip-link .link-icon { font-size: 11px; }
+
+  /* ── ACCOMMODATION ──────────────────── */
+  .accom-card {
+    margin-top: 12px;
+    margin-left: 36px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #f0ebe3, #faf8f4);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--sand);
+  }
+  .accom-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--earth);
+    margin-bottom: 4px;
+  }
+  .accom-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+  }
+  .accom-tips {
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  /* ── BUDGET BAR ─────────────────────── */
+  .budget-bar {
+    display: flex;
+    gap: 16px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+    font-size: 13px;
+  }
+  .budget-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .budget-icon { font-size: 15px; }
+  .budget-label { color: var(--text-muted); font-size: 12px; }
+  .budget-value { font-weight: 600; font-family: var(--mono); font-size: 13px; }
+  .budget-total {
+    margin-left: auto;
+    font-weight: 700;
+    color: var(--forest);
+    font-size: 15px;
+  }
+
+  /* ── MAP TILE ───────────────────────── */
+  .map-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  .map-canvas {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+  }
+  .mapboxgl-canvas { outline: none; }
+  .map-marker {
+    cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .map-marker:hover { transform: scale(1.2); }
+  .map-marker-label {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    fill: var(--forest);
+  }
+  .map-legend {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background: rgba(255,255,255,0.92);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+  }
+  .map-legend-item { display: flex; align-items: center; gap: 6px; }
+  .map-legend-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+
+  /* ── ROUTE HINTS (Streckenhinweise) ── */
+  .hint {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    line-height: 1.45;
+    align-items: flex-start;
+  }
+  .hint:last-child { border-bottom: none; }
+  .hint-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+    margin-top: 1px;
+  }
+  .hint-content { flex: 1; }
+  .hint-title { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+  .hint-text { color: var(--text-muted); font-size: 12.5px; }
+  .hint-tag {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .hint-tag.warn { background: var(--tag-warn); color: var(--tag-warn-text); }
+  .hint-tag.danger { background: var(--tag-danger); color: var(--tag-danger-text); }
+  .hint-tag.fuel { background: var(--tag-fuel); color: var(--tag-fuel-text); }
+  .hint-tag.info { background: var(--tag-photo); color: var(--tag-photo-text); }
+
+  /* Height Profile Mini Chart */
+  .height-profile {
+    margin-top: 10px;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+  }
+  .height-profile-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .height-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 50px;
+  }
+  .height-bar {
+    flex: 1;
+    border-radius: 3px 3px 0 0;
+    min-height: 4px;
+    position: relative;
+    transition: opacity 0.2s;
+  }
+  .height-bar:hover { opacity: 0.8; }
+  .height-bar.low { background: var(--forest-light); }
+  .height-bar.mid { background: var(--warn); }
+  .height-bar.high { background: var(--danger); }
+  .height-labels {
+    display: flex;
+    gap: 3px;
+    margin-top: 3px;
+  }
+  .height-label {
+    flex: 1;
+    font-size: 9px;
+    font-family: var(--mono);
+    color: var(--text-light);
+    text-align: center;
+  }
+
+  /* Country flags bar */
+  .countries-bar {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .country-chip {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--bg);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+  }
+  .country-chip .flag { font-size: 14px; }
+  .country-chip .maut {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--mono);
+  }
+
+  /* ── TOTAL VIEW ─────────────────────── */
+  .total-view { display: none; }
+  .total-view.active { display: flex; flex-direction: column; }
+
+  .total-grid {
+    display: flex;
+    padding: 14px 28px 28px;
+    flex: 1;
+    min-height: 0;
+    gap: 0;
+  }
+  .total-left {
+    display: flex;
+    flex-direction: column;
+    min-width: 280px;
+    overflow: hidden;
+  }
+  .total-right {
+    display: flex;
+    flex-direction: column;
+    min-width: 220px;
+    overflow: hidden;
+    gap: 0;
+  }
+  .total-grid .tile { min-height: 0; flex: 1; }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    padding: 14px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    text-align: center;
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--forest);
+    font-family: var(--mono);
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  .highlight-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .highlight-item:last-child { border-bottom: none; }
+  .highlight-day {
+    font-size: 11px;
+    color: var(--copper);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .highlight-text { margin-top: 3px; line-height: 1.45; }
+
+  .checklist { list-style: none; }
+  .checklist li {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .check-icon { flex-shrink: 0; margin-top: 1px; }
+
+  /* ── WEATHER STRIP ──────────────────── */
+  .weather-strip {
+    display: flex;
+    gap: 6px;
+    padding: 10px 18px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+  .weather-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 10px;
+    font-size: 11px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    min-width: 56px;
+  }
+  .weather-chip .temp {
+    font-weight: 600;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .weather-chip .time { color: var(--text-light); font-size: 10px; }
+
+  /* ── SCROLLBAR ──────────────────────── */
+  .tile-body::-webkit-scrollbar { width: 5px; }
+  .tile-body::-webkit-scrollbar-track { background: transparent; }
+  .tile-body::-webkit-scrollbar-thumb { background: var(--sand); border-radius: 10px; }
+  .tile-body::-webkit-scrollbar-thumb:hover { background: var(--earth); }
+
+  /* ── RESPONSIVE ─────────────────────── */
+  @media (max-width: 1100px) {
+    .tiles {
+      flex-direction: column;
+      height: auto;
+    }
+    .tiles-left, .tiles-right { width: 100% !important; }
+    .tiles-left { max-height: 500px; }
+    .tile-b { min-height: 250px; }
+    .tile-c { max-height: 350px; }
+    .drag-h { display: none; }
+    .total-grid { flex-direction: column; }
+    .total-left, .total-right { width: 100% !important; }
+    #dragH2 { display: none; }
+  }
+
+  /* Fade-in animation */
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .tile { animation: fadeSlideIn 0.3s ease-out; }
+  .tile-b { animation-delay: 0.05s; }
+  .tile-c { animation-delay: 0.1s; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ HEADER ═══════ -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">Touren<span>planer</span></div>
+    <div style="font-size:12px; opacity:0.6; margin-left:4px;">Dein KI Agent für feine Touren</div>
+    <div class="vehicle-badge">🛵 Vespa 125cc · max 90 km/h · keine Autobahn</div>
+  </div>
+  <div class="header-right">
+    <button class="btn-header" onclick="toggleView('form')">✏️ Neue Tour</button>
+    <button class="btn-header">📥 GPX Export</button>
+    <div style="font-size:11px; opacity:0.5; display:flex; align-items:center; gap:4px; margin-left:8px; border-left:1px solid rgba(255,255,255,0.15); padding-left:12px;">by rosch-lab</div>
+  </div>
+</div>
+
+<!-- ═══════ DAY PILLS ═══════ -->
+<div class="day-nav" id="dayNav">
+  <div class="day-pill active" data-day="1" onclick="switchDay(1)">Tag 1 · München→Innsbruck</div>
+  <div class="day-pill" data-day="2" onclick="switchDay(2)">Tag 2 · Innsbruck→Brenner</div>
+  <div class="day-pill" data-day="3" onclick="switchDay(3)">Tag 3 · Brenner→Bozen</div>
+  <div class="day-pill" data-day="4" onclick="switchDay(4)">Tag 4 · Bozen→Dolomiten</div>
+  <div class="day-pill" data-day="5" onclick="switchDay(5)">Tag 5 · Dolomiten→Gardasee</div>
+  <div class="day-pill total" data-day="total" onclick="switchDay('total')">📊 Total</div>
+</div>
+
+<!-- ═══════ DAY VIEWS (Tiles) ═══════ -->
+<div class="tiles" id="tilesView">
+  <!-- LEFT PANEL -->
+  <div class="tiles-left" id="tilesLeft" style="flex: 2;">
+    <!-- TILE A: POIs & Tipps -->
+    <div class="tile tile-a" id="tileA">
+      <div class="tile-header">
+        <span>📍 Tagesetappe <span id="tileATitle">München → Innsbruck</span></span>
+        <span class="subtitle" id="tileAMeta">142 km · ~4h · 4 Stopps</span>
+      </div>
+      <div class="tile-body" id="tileABody">
+        <!-- Content injected by JS -->
+      </div>
+      <div class="budget-bar" id="budgetBar">
+        <div class="budget-item"><span class="budget-icon">⛽</span><span class="budget-label">Sprit</span><span class="budget-value" id="budgetFuel">€12</span></div>
+        <div class="budget-item"><span class="budget-icon">🍽️</span><span class="budget-label">Essen</span><span class="budget-value" id="budgetFood">€35</span></div>
+        <div class="budget-item"><span class="budget-icon">🛏️</span><span class="budget-label">Schlaf</span><span class="budget-value" id="budgetSleep">€65</span></div>
+        <div class="budget-total" id="budgetTotal">Σ €112</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VERTICAL DRAG HANDLE -->
+  <div class="drag-h" id="dragH1"></div>
+
+  <!-- RIGHT PANEL -->
+  <div class="tiles-right" id="tilesRight" style="flex: 1;">
+    <!-- TILE B: Karte -->
+    <div class="tile tile-b" id="tileB" style="flex: 1;">
+      <div class="tile-header">
+        <span>🗺️ Tagesroute</span>
+        <span class="subtitle" id="tileBCountry">🇩🇪 → 🇦🇹</span>
+      </div>
+      <div class="map-container" id="mapContainer">
+        <div class="map-canvas" id="mapCanvas"></div>
+        <div class="map-legend">
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:var(--forest)"></div> Stopp</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:var(--copper)"></div> Route (keine Autobahn)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HORIZONTAL DRAG HANDLE -->
+    <div class="drag-v" id="dragV1"></div>
+
+    <!-- TILE C: Streckenhinweise -->
+    <div class="tile tile-c" id="tileC" style="flex: 1;">
+      <div class="tile-header">
+        <span>⚠️ Streckenhinweise</span>
+        <span class="subtitle">Vespa-spezifisch</span>
+      </div>
+      <div class="tile-body" id="tileCBody">
+        <!-- Content injected by JS -->
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- ═══════ TOTAL VIEW ═══════ -->
+<div class="total-view" id="totalView">
+  <div class="total-grid">
+    <!-- LEFT: Stats + Highlights -->
+    <div class="total-left" id="totalLeft" style="flex: 1;">
+      <div class="tile" style="flex:1; overflow-y: auto;">
+        <div class="tile-header">
+          <span>📊 Tour-Zusammenfassung</span>
+          <span class="subtitle">München → Gardasee · 5 Tage</span>
+        </div>
+      <div class="tile-body">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-value">487</div>
+            <div class="stat-label">Gesamt km</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">5</div>
+            <div class="stat-label">Tage</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">€530</div>
+            <div class="stat-label">Budget gesamt</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">20</div>
+            <div class="stat-label">Stops</div>
+          </div>
+        </div>
+
+        <h3 style="font-size:14px; color:var(--forest); margin-bottom:10px;">🌟 Beste Highlights</h3>
+
+        <div class="highlight-item">
+          <div class="highlight-day">Tag 1 · München → Innsbruck</div>
+          <div class="highlight-text">Kochel am See – Walchenseeblick von der alten Kesselbergstraße. Einer der schönsten Alpenseen, perfekt für eine erste Pause.</div>
+        </div>
+        <div class="highlight-item">
+          <div class="highlight-day">Tag 2 · Innsbruck → Brenner</div>
+          <div class="highlight-text">Europa-Brücke Aussichtspunkt – Blick auf die höchste Brücke Europas (190m). Manche übersehen den kleinen Parkplatz auf der alten Straße.</div>
+        </div>
+        <div class="highlight-item">
+          <div class="highlight-day">Tag 3 · Brenner → Bozen</div>
+          <div class="highlight-text">Eisack-Radweg entlang der alten Römerstraße – die Vespa teilt sich hier Teilstücke mit Radfahrern. Langsam fahren, die Schlucht genießen.</div>
+        </div>
+        <div class="highlight-item">
+          <div class="highlight-day">Tag 4 · Bozen → Dolomiten</div>
+          <div class="highlight-text">Grödner Joch bei Sonnenaufgang – wenn du früh losfährst, hast du die Straße fast für dich allein. Unbezahlbar.</div>
+        </div>
+        <div class="highlight-item">
+          <div class="highlight-day">Tag 5 · Dolomiten → Gardasee</div>
+          <div class="highlight-text">Ponale-Straße (alte Militärstraße) – der spektakulärste Weg an den Gardasee. Heute nur noch für Fußgänger/Radler, aber ein kurzer Abstecher zu Fuß lohnt sich!</div>
+        </div>
+
+        <h3 style="font-size:14px; color:var(--forest); margin: 20px 0 10px;">🎒 Packliste Vespa Alpenüberquerung</h3>
+        <ul class="checklist">
+          <li><span class="check-icon">☐</span> Regenkombi (auch im Sommer – Alpen!)</li>
+          <li><span class="check-icon">☐</span> Warme Schicht für Passfahrten (Fleece/Softshell)</li>
+          <li><span class="check-icon">☐</span> Erste-Hilfe-Set + Warndreieck + Warnweste (Pflicht AT/IT)</li>
+          <li><span class="check-icon">☐</span> Reservekanister 1L (rechtliche Lage vorher prüfen)</li>
+          <li><span class="check-icon">☐</span> Spanngurte für Gepäck</li>
+          <li><span class="check-icon">☐</span> Ladekabel + Powerbank</li>
+          <li><span class="check-icon">☐</span> Sonnenbrille + Sonnencreme (Höhensonne!)</li>
+          <li><span class="check-icon">☐</span> Grüne Versicherungskarte + Zulassung</li>
+          <li><span class="check-icon">☐</span> ÖAMTC/ADAC Auslandsschutzbrief</li>
+          <li><span class="check-icon">☐</span> Ersatz-Zündkerze + Werkzeug-Basics</li>
+        </ul>
+
+        <h3 style="font-size:14px; color:var(--forest); margin: 20px 0 10px;">💰 Budget-Aufschlüsselung</h3>
+        <table style="width:100%; font-size:13px; border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid var(--border); text-align:left;">
+              <th style="padding:8px 4px; font-weight:600;">Tag</th>
+              <th style="padding:8px 4px; font-weight:600;">⛽ Sprit</th>
+              <th style="padding:8px 4px; font-weight:600;">🍽️ Essen</th>
+              <th style="padding:8px 4px; font-weight:600;">🛏️ Schlaf</th>
+              <th style="padding:8px 4px; font-weight:600;">Σ</th>
+            </tr>
+          </thead>
+          <tbody style="font-family:var(--mono); font-size:12px;">
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:6px 4px;">Tag 1</td><td>€12</td><td>€35</td><td>€65</td><td style="font-weight:600;">€112</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:6px 4px;">Tag 2</td><td>€10</td><td>€30</td><td>€70</td><td style="font-weight:600;">€110</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:6px 4px;">Tag 3</td><td>€8</td><td>€35</td><td>€55</td><td style="font-weight:600;">€98</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:6px 4px;">Tag 4</td><td>€14</td><td>€40</td><td>€60</td><td style="font-weight:600;">€114</td></tr>
+            <tr style="border-bottom:1px solid var(--border);"><td style="padding:6px 4px;">Tag 5</td><td>€10</td><td>€38</td><td>€48</td><td style="font-weight:600;">€96</td></tr>
+            <tr style="border-top:2px solid var(--forest);"><td style="padding:8px 4px; font-weight:700;">Gesamt</td><td style="font-weight:700;">€54</td><td style="font-weight:700;">€178</td><td style="font-weight:700;">€298</td><td style="font-weight:700; color:var(--forest);">€530</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div><!-- /total-left -->
+
+    <!-- VERTICAL DRAG HANDLE -->
+    <div class="drag-h" id="dragH2"></div>
+
+    <!-- RIGHT: Map + Tips -->
+    <div class="total-right" id="totalRight" style="flex: 1;">
+    <!-- Gesamtkarte -->
+    <div class="tile">
+      <div class="tile-header">
+        <span>🗺️ Gesamtroute</span>
+        <span class="subtitle">487 km · 5 Tage</span>
+      </div>
+      <div class="map-container">
+        <div class="map-canvas" id="totalMapCanvas"></div>
+        <div class="map-legend">
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#c8702a"></div> Tag 1</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#3d6b4f"></div> Tag 2</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#5b8ab5"></div> Tag 3</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#7b5a9e"></div> Tag 4</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="background:#c45c4a"></div> Tag 5</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HORIZONTAL DRAG HANDLE -->
+    <div class="drag-v" id="dragV2"></div>
+
+    <!-- Übergreifende Tipps -->
+    <div class="tile" style="overflow-y:auto;">
+      <div class="tile-header">
+        <span>📋 Übergreifende Tipps</span>
+        <span class="subtitle">Vespa Alpenüberquerung</span>
+      </div>
+      <div class="tile-body">
+        <div class="hint">
+          <div class="hint-icon">🛵</div>
+          <div class="hint-content">
+            <div class="hint-title">Vespa-Check vor Abfahrt</div>
+            <div class="hint-text">Ölstand, Reifendruck (kalt: 1.8 bar vorne / 2.2 hinten bei Beladung), Bremsen, Licht. Bei Alpentouren besonders wichtig: Bremsbeläge prüfen – Gefälle frisst Beläge.</div>
+          </div>
+        </div>
+        <div class="hint">
+          <div class="hint-icon">⛽</div>
+          <div class="hint-content">
+            <div class="hint-title">Tankstrategie Alpen</div>
+            <div class="hint-text">Nie unter halb tanken im Gebirge. Zwischen Brenner und Bozen gibt's Lücken von 40+ km ohne Tankstelle. Sonntags haben viele kleine Tankstellen in Italien zu.</div>
+          </div>
+        </div>
+        <div class="hint">
+          <div class="hint-icon">🌡️</div>
+          <div class="hint-content">
+            <div class="hint-title">Temperaturmanagement</div>
+            <div class="hint-text">Zwiebelprinzip! Tal: 28°C, Pass: 12°C – das sind 16° Unterschied innerhalb einer Stunde. Handschuhe immer griffbereit im Topcase.</div>
+          </div>
+        </div>
+        <div class="hint">
+          <div class="hint-icon">📱</div>
+          <div class="hint-content">
+            <div class="hint-title">Navigation & Offline-Karten</div>
+            <div class="hint-text">In Tälern und Tunneln oft kein Empfang. Offline-Karten vorher laden (Mapbox/Google Maps). Handyhalterung mit Vibrationsdämpfer empfohlen.</div>
+          </div>
+        </div>
+        <div class="hint">
+          <div class="hint-icon">🏷️</div>
+          <div class="hint-content">
+            <div class="hint-title">Maut & Vignette Zusammenfassung</div>
+            <div class="hint-text">🇩🇪 Keine Maut für Vespa. 🇦🇹 Keine Vignette für Motorräder &lt;125cc – aber Achtung: Brenner-Maut fällt an (Sondermaut, ~€9). 🇮🇹 Keine Maut auf Landstraßen, nur Autobahn (die wir meiden).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div><!-- /total-right -->
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// TourAgent v3.1 – Demo Data & Logic
+// ═══════════════════════════════════════════════
+
+const tourData = {
+  1: {
+    title: "München → Innsbruck",
+    meta: "142 km · ~4h · 4 Stopps",
+    countries: "🇩🇪 → 🇦🇹",
+    budget: { fuel: 12, food: 35, sleep: 65 },
+    weather: [
+      { time: "08:00", icon: "🌤️", temp: "14°" },
+      { time: "11:00", icon: "☀️", temp: "22°" },
+      { time: "14:00", icon: "⛅", temp: "20°" },
+      { time: "17:00", icon: "🌤️", temp: "18°" },
+    ],
+    stops: [
+      {
+        name: "Kochel am See",
+        meta: "52 km · 10:30 Uhr · 45 min Pause",
+        desc: "Malerischer Alpensee am Fuß der Berge. Hier beginnt das Alpen-Feeling – perfekt für die erste Kaffeepause mit Seeblick.",
+        tips: [
+          { type: "tip", tag: "Insider", text: "Die alte Kesselbergstraße (nicht die neue!) bietet einen atemberaubenden Blick auf den Walchensee. Links abbiegen vor dem Tunnel.", links: ["Google Maps:https://www.google.com/maps/search/Kesselbergstraße+Kochel", "Wikipedia:https://de.wikipedia.org/wiki/Kesselbergstraße"] },
+          { type: "photo", tag: "Foto-Spot", text: "Am Nordufer des Kochelsees mit den Bergen im Hintergrund – morgens spiegelt sich alles im Wasser.", links: ["Google:https://www.google.com/search?q=Kochelsee+Foto+Spot+Nordufer"] },
+          { type: "food", tag: "Einkehr", text: "Café Herzogstand direkt am See. Apfelstrudel ist legendär, Cappuccino mittelmäßig.", links: ["Google Maps:https://www.google.com/maps/search/Café+Herzogstand+Kochel", "Tripadvisor:https://www.tripadvisor.com/Search?q=Café+Herzogstand+Kochel"] },
+        ]
+      },
+      {
+        name: "Mittenwald",
+        meta: "85 km · 12:30 Uhr · 60 min Mittagspause",
+        desc: "Die 'Geigenbauerstadt' mit wunderschönen Lüftlmalereien. Direkt an der Grenze zu Österreich, wo die Isar noch kristallklar ist.",
+        tips: [
+          { type: "hidden", tag: "Geheimtipp", text: "Die Leutascher Geisterklamm (3 km westlich) – über 400m lange Stahlbrücke über die Schlucht. Spektakulär und fast leer um die Mittagszeit.", links: ["Google:https://www.google.com/search?q=Leutascher+Geisterklamm", "Wikipedia:https://de.wikipedia.org/wiki/Leutaschklamm"] },
+          { type: "tip", tag: "Insider", text: "In der Obermarktstraße stehen die schönsten bemalten Häuser. Nr. 23 hat ein fast 300 Jahre altes Fresko.", links: ["Google Maps:https://www.google.com/maps/search/Obermarktstraße+Mittenwald"] },
+          { type: "food", tag: "Einkehr", text: "Gasthof Stern – bodenständig bayerisch. Die Schweinshaxn ist riesig, lieber zu zweit bestellen.", links: ["Google Maps:https://www.google.com/maps/search/Gasthof+Stern+Mittenwald", "Tripadvisor:https://www.tripadvisor.com/Search?q=Gasthof+Stern+Mittenwald"] },
+        ]
+      },
+      {
+        name: "Seefeld in Tirol",
+        meta: "108 km · 14:30 Uhr · 30 min",
+        desc: "Olympia-Ort auf einem sonnigen Hochplateau. Die Vespa braucht hier den ersten spürbaren Anstieg – aber noch harmlos.",
+        tips: [
+          { type: "photo", tag: "Foto-Spot", text: "Vom Seekirchl (kleine Kirche am Ortsrand) hat man bei klarer Sicht einen 360°-Panoramablick. Parkplatz direkt dahinter.", links: ["Google:https://www.google.com/search?q=Seekirchl+Seefeld+Panorama", "Google Maps:https://www.google.com/maps/search/Seekirchl+Seefeld"] },
+          { type: "nature", tag: "Natur", text: "Wildsee (5 min zu Fuß vom Zentrum) – smaragdgrün, je nach Licht fast unwirklich. Perfekt um die Füße reinzuhängen.", links: ["Google:https://www.google.com/search?q=Wildsee+Seefeld+Tirol"] },
+          { type: "tip", tag: "Insider", text: "Am Postamt gibt's einen Stempel für den Vespa-Reisepass (falls du einen führst). Die Dame an der Kasse macht das gerne.", links: [] },
+        ]
+      },
+      {
+        name: "Innsbruck (Altstadt)",
+        meta: "142 km · 16:30 Uhr · Ankunft",
+        desc: "Goldenes Dachl, Nordkette, Inn-Ufer. Die letzte Etappe runter nach Innsbruck ist eine geniale Abfahrt mit Blick auf die Stadt.",
+        tips: [
+          { type: "hidden", tag: "Geheimtipp", text: "Das Stiftskeller Biergarten hinter dem Dom – hier sitzen fast nur Einheimische. Im Sommer draußen unter Kastanien.", links: ["Google Maps:https://www.google.com/maps/search/Stiftskeller+Innsbruck", "Tripadvisor:https://www.tripadvisor.com/Search?q=Stiftskeller+Innsbruck"] },
+          { type: "photo", tag: "Foto-Spot", text: "Von der Innbrücke Richtung Altstadt – die bunten Häuser mit Nordkette dahinter. DAS Innsbruck-Foto.", links: ["Google:https://www.google.com/search?q=Innbrücke+Innsbruck+Foto"] },
+          { type: "food", tag: "Einkehr", text: "Machete – mexikanisch-alpin Fusion. Klingt schräg, ist großartig. Burritos mit Tiroler Speck.", links: ["Google Maps:https://www.google.com/maps/search/Machete+Innsbruck", "Tripadvisor:https://www.tripadvisor.com/Search?q=Machete+Innsbruck"] },
+        ],
+        accom: {
+          name: "Nala Individuell Hotel",
+          meta: "★★★★ · ab €65/Nacht · Stadtmitte · Vespa-Parkplatz im Hof",
+          tips: "Abends: Bergisel-Schanze zu Fuß erreichbar (20 min), nachts beleuchtet. Morgens: Frühstück im Hotel ist gut, aber Café Central hat die besseren Croissants."
+        }
+      }
+    ],
+    hints: [
+      { icon: "⛽", title: "Tankstopp empfohlen: Kochel", text: "Nächste günstige Tankstelle erst wieder in Mittenwald (33 km). Im Gebirge steigt der Verbrauch um ~30%.", tag: "fuel" },
+      { icon: "⛰️", title: "Steigung: Kesselberg (850m → 800m)", text: "Erster Alpenpass der Tour – aber harmlos für die Vespa. Im 2. Gang bleiben, nicht überdrehen. Achtung: Radfahrer auf der Strecke!", tag: "warn" },
+      { icon: "🏷️", title: "Grenze DE→AT bei Scharnitz", text: "Keine Grenzkontrolle (Schengen), aber Österreich-Vignette beachten: Vespa <125cc ist BEFREIT! Keine Vignette nötig.", tag: "info" },
+      { icon: "🌡️", title: "Temperatursturz Seefeld→Innsbruck", text: "Plateau Seefeld (1200m): ~16°C. Abfahrt Innsbruck (570m): ~22°C. Jacke auf dem Plateau, runter wird's warm.", tag: "warn" },
+    ],
+    heightProfile: [
+      { label: "MUC", height: 520, max: 2200 },
+      { label: "Starn", height: 590, max: 2200 },
+      { label: "Kochel", height: 600, max: 2200 },
+      { label: "Kessel", height: 858, max: 2200 },
+      { label: "Mittw", height: 920, max: 2200 },
+      { label: "Schar", height: 960, max: 2200 },
+      { label: "Seef", height: 1180, max: 2200 },
+      { label: "IBK", height: 574, max: 2200 },
+    ],
+    countryInfo: [
+      { flag: "🇩🇪", name: "DE", maut: "frei" },
+      { flag: "🇦🇹", name: "AT", maut: "frei*" },
+    ],
+    // Map coordinates (simplified for SVG simulation)
+    mapStops: [
+      { name: "München", lng: 11.576, lat: 48.137 },
+      { name: "Kochel", lng: 11.369, lat: 47.659 },
+      { name: "Mittenwald", lng: 11.264, lat: 47.442 },
+      { name: "Seefeld", lng: 11.188, lat: 47.330 },
+      { name: "Innsbruck", lng: 11.394, lat: 47.269 },
+    ]
+  },
+  2: {
+    title: "Innsbruck → Brenner",
+    meta: "68 km · ~2.5h · 4 Stopps",
+    countries: "🇦🇹 → 🇦🇹/🇮🇹",
+    budget: { fuel: 10, food: 30, sleep: 70 },
+    weather: [
+      { time: "08:00", icon: "🌤️", temp: "12°" },
+      { time: "11:00", icon: "☀️", temp: "19°" },
+      { time: "14:00", icon: "☀️", temp: "17°" },
+      { time: "17:00", icon: "⛅", temp: "14°" },
+    ],
+    stops: [
+      {
+        name: "Bergisel & Patscherkofel Panoramastraße",
+        meta: "8 km · 09:00 Uhr · 45 min",
+        desc: "Start mit dem Stadtpanorama über Innsbruck. Die Panoramastraße rauf zum Patscherkofel-Parkplatz gibt einen Vorgeschmack auf die Alpenpässe.",
+        tips: [
+          { type: "photo", tag: "Foto-Spot", text: "Bergisel-Schanze: Aussichtsplattform oben (€9 Eintritt). Alternativ: kostenlos von der Straße daneben fast genauso guter Blick.", links: ["Google Maps:https://www.google.com/maps/search/Bergisel+Schanze+Innsbruck", "Wikipedia:https://de.wikipedia.org/wiki/Bergiselschanze"] },
+          { type: "tip", tag: "Insider", text: "Tankstelle am Fuß des Bergisel (OMV): letzte günstige Tankstelle vor dem Brenner. In AT ca. €0.10/L günstiger als IT.", links: ["Google Maps:https://www.google.com/maps/search/OMV+Tankstelle+Bergisel+Innsbruck"] },
+          { type: "nature", tag: "Natur", text: "Die alte Römerstraße (Via Raetia) führt als Wanderweg parallel zur Europabrücke. Man sieht die Brücke von unten – beeindruckend.", links: ["Google:https://www.google.com/search?q=Via+Raetia+Innsbruck+Wanderweg"] },
+        ]
+      },
+      {
+        name: "Matrei am Brenner",
+        meta: "28 km · 10:30 Uhr · 30 min",
+        desc: "Letzter größerer Ort vor dem Pass. Die alte Brennerstraße beginnt hier – schmaler, steiler, aber herrlich ruhig.",
+        tips: [
+          { type: "hidden", tag: "Geheimtipp", text: "Maria Waldrast Kloster (Abstecher 6 km): höchstgelegenes Kloster Tirols. Die Stille dort oben ist fast surreal. Kleine Gaststube im Kloster.", links: ["Google:https://www.google.com/search?q=Maria+Waldrast+Kloster", "Wikipedia:https://de.wikipedia.org/wiki/Kloster_Maria_Waldrast"] },
+          { type: "food", tag: "Einkehr", text: "Bäckerei Ruetz in Matrei – hol dir ein Vinschgauer Brötl für die Passhöhe. Frisch und günstig.", links: ["Google Maps:https://www.google.com/maps/search/Bäckerei+Ruetz+Matrei"] },
+          { type: "tip", tag: "Insider", text: "Alte Brennerstraße (B182): Unbedingt diese nehmen statt der neuen Straße. Weniger Verkehr, mehr Kurven, tolle Aussicht.", links: ["Google:https://www.google.com/search?q=Alte+Brennerstraße+B182"] },
+        ]
+      },
+      {
+        name: "Europabrücke Aussichtspunkt",
+        meta: "38 km · 11:30 Uhr · 20 min",
+        desc: "Blick auf die höchste Brücke Europas (190m). Von der alten Straße hat man den besten Ausblick – die Autofahrer auf der Autobahn sehen nichts davon.",
+        tips: [
+          { type: "photo", tag: "Foto-Spot", text: "Kleiner Parkplatz auf der alten Straße (vor der Schranke rechts). Von hier sieht man die Brücke in voller Pracht.", links: ["Google Maps:https://www.google.com/maps/search/Europabrücke+Aussichtspunkt+Brenner"] },
+          { type: "tip", tag: "Insider", text: "Die Maut für den Brenner (Sondermautabschnitt) gilt auch für die alte Straße: ~€9 für Motorräder. Nicht erschrecken.", links: ["Google:https://www.google.com/search?q=Brenner+Maut+Motorrad+Preis"] },
+          { type: "nature", tag: "Natur", text: "Von hier führt ein kleiner Pfad 10 min runter zum Sillfluss. Im Sommer perfekt zum Füße kühlen.", links: [] },
+        ]
+      },
+      {
+        name: "Brennerpass (1.370m)",
+        meta: "68 km · 13:00 Uhr · Ankunft",
+        desc: "Der niedrigste Alpenhauptübergang – und trotzdem ein Meilenstein! Ab hier: Bella Italia.",
+        tips: [
+          { type: "tip", tag: "Insider", text: "Das Outlet-Center am Brenner hat überraschend günstige italienische Marken. Wer Platz hat: Leder-Handschuhe für die Vespa gibt's ab €25.", links: ["Google Maps:https://www.google.com/maps/search/Outlet+Center+Brenner"] },
+          { type: "photo", tag: "Foto-Spot", text: "Am Grenzstein 'ITALIA / ÖSTERREICH' – das klassische Vespa-auf-dem-Pass Foto. Vespa daneben stellen, fertig.", links: ["Google:https://www.google.com/search?q=Brennerpass+Grenzstein+Foto"] },
+          { type: "food", tag: "Einkehr", text: "Direkt am Pass: Brennero/Brenner Stube – touristisch aber okay. Besser: 2 km weiter auf italienischer Seite, Trattoria al Lupo.", links: ["Google Maps:https://www.google.com/maps/search/Trattoria+al+Lupo+Brennero", "Tripadvisor:https://www.tripadvisor.com/Search?q=Trattoria+al+Lupo+Brennero"] },
+        ],
+        accom: {
+          name: "Gasthof Alpenrose Brenner",
+          meta: "★★★ · ab €70/Nacht · direkt am Pass · Garage für Vespa",
+          tips: "Abends: Sonnenuntergang vom Pass – die Berge werden rosa. Morgens: Früh los (7:30) – die Abfahrt nach Sterzing ist morgens am schönsten."
+        }
+      }
+    ],
+    hints: [
+      { icon: "⛽", title: "Letzter günstiger Sprit: Innsbruck", text: "In Österreich tanken! AT ist ~€0.10/L günstiger als Italien. OMV am Bergisel empfohlen.", tag: "fuel" },
+      { icon: "⛰️", title: "Brennerpass: 1.370m", text: "Steigung moderat (~6%), für Vespa gut machbar. Aber: 800 Höhenmeter am Stück, Vespa läuft im letzten Drittel merklich langsamer. 2./3. Gang.", tag: "warn" },
+      { icon: "🏷️", title: "Brenner-Maut: ~€9 Motorrad", text: "Auch alte Brennerstraße ist mautpflichtig. Bezahlung an Mautstation (Karte/Bar). Keine Vignette nötig.", tag: "info" },
+      { icon: "🌡️", title: "Temperatur Passhöhe", text: "Innsbruck (574m): ~20°C → Brenner (1370m): ~12°C. 8 Grad Unterschied! Fleece/Windjacke bereithalten.", tag: "warn" },
+    ],
+    heightProfile: [
+      { label: "IBK", height: 574, max: 2200 },
+      { label: "Bergi", height: 740, max: 2200 },
+      { label: "Schön", height: 850, max: 2200 },
+      { label: "Matrei", height: 990, max: 2200 },
+      { label: "Stei", height: 1100, max: 2200 },
+      { label: "Gries", height: 1200, max: 2200 },
+      { label: "Grenz", height: 1320, max: 2200 },
+      { label: "BREN", height: 1370, max: 2200 },
+    ],
+    countryInfo: [
+      { flag: "🇦🇹", name: "AT", maut: "Brenner €9" },
+      { flag: "🇮🇹", name: "IT", maut: "frei (Landstr.)" },
+    ],
+    mapStops: [
+      { name: "Innsbruck", lng: 11.394, lat: 47.269 },
+      { name: "Bergisel", lng: 11.397, lat: 47.249 },
+      { name: "Matrei", lng: 11.453, lat: 47.130 },
+      { name: "Europabrücke", lng: 11.460, lat: 47.080 },
+      { name: "Brenner", lng: 11.507, lat: 47.000 },
+    ]
+  },
+  3: {
+    title: "Brenner → Bozen",
+    meta: "82 km · ~3h · 4 Stopps",
+    countries: "🇮🇹",
+    budget: { fuel: 8, food: 35, sleep: 55 },
+    weather: [
+      { time: "08:00", icon: "⛅", temp: "11°" },
+      { time: "11:00", icon: "☀️", temp: "23°" },
+      { time: "14:00", icon: "☀️", temp: "26°" },
+      { time: "17:00", icon: "🌤️", temp: "24°" },
+    ],
+    stops: [
+      {
+        name: "Sterzing / Vipiteno",
+        meta: "14 km · 08:30 Uhr · 45 min",
+        desc: "Mittelalterliche Altstadt mit dem berühmten Zwölferturm. Hier merkt man sofort: Du bist in Südtirol. Deutsch und Italienisch mischen sich.",
+        tips: [
+          { type: "tip", tag: "Insider", text: "Die Milchbar Sterzing (ja, DIE Joghurt-Marke) hat einen Werksverkauf am Stadtrand. Frischer geht's nicht.", links: ["Google Maps:https://www.google.com/maps/search/Milchbar+Sterzing+Vipiteno", "Google:https://www.google.com/search?q=Sterzing+Joghurt+Werksverkauf"] },
+          { type: "photo", tag: "Foto-Spot", text: "Die Neustadt-Gasse Richtung Zwölferturm – der symmetrische Blick auf den Turm ist ikonisch.", links: ["Google:https://www.google.com/search?q=Zwölferturm+Sterzing+Foto"] },
+          { type: "food", tag: "Einkehr", text: "Café Katzung: Südtirols bester Apfelstrudel (heiß umstritten, aber hier wirklich gut). Dazu einen Verlängerten.", links: ["Google Maps:https://www.google.com/maps/search/Café+Katzung+Sterzing", "Tripadvisor:https://www.tripadvisor.com/Search?q=Café+Katzung+Sterzing"] },
+        ]
+      },
+      {
+        name: "Franzensfeste / Fortezza",
+        meta: "32 km · 10:00 Uhr · 30 min",
+        desc: "Riesige Festung aus dem 19. Jh., heute Ausstellungsort. Die Vespa-Strecke am Eisack entlang ist herrlich.",
+        tips: [
+          { type: "hidden", tag: "Geheimtipp", text: "Die Festung hat oft kostenlose Kunstausstellungen. Lohnt sich für 20 min – und die Toiletten sind sauber (unterwegs im Gebirge wertvoll!).", links: ["Google:https://www.google.com/search?q=Franzensfeste+Festung+Ausstellung", "Wikipedia:https://de.wikipedia.org/wiki/Franzensfeste"] },
+          { type: "nature", tag: "Natur", text: "Am Stausee hinter der Festung kann man kurz die Füße ins Wasser halten. Kristallklar.", links: ["Google Maps:https://www.google.com/maps/search/Stausee+Franzensfeste"] },
+          { type: "tip", tag: "Insider", text: "Ab hier die SS12 nehmen (nicht die Schnellstraße). Die alte Straße folgt dem Eisack durch eine enge Schlucht – spektakulär.", links: ["Google:https://www.google.com/search?q=SS12+Eisacktal+alte+Straße"] },
+        ]
+      },
+      {
+        name: "Klausen / Chiusa",
+        meta: "55 km · 11:30 Uhr · 60 min Mittagspause",
+        desc: "Eines der schönsten Dörfer Italiens! Enge Gassen, Kloster Säben hoch oben. Hier fühlst du dich wie im Mittelalter.",
+        tips: [
+          { type: "hidden", tag: "Geheimtipp", text: "Kloster Säben (30 min Aufstieg): wie ein kleines Mont-Saint-Michel. Die Vespa unten parken und hochlaufen – die Aussicht belohnt alles.", links: ["Google:https://www.google.com/search?q=Kloster+Säben+Klausen", "Wikipedia:https://de.wikipedia.org/wiki/Kloster_Säben"] },
+          { type: "food", tag: "Einkehr", text: "Gasthof Walther: Schlutzkrapfen (Südtiroler Maultaschen) mit Butter und Salbei. Das Nationalgericht.", links: ["Google Maps:https://www.google.com/maps/search/Gasthof+Walther+Klausen", "Tripadvisor:https://www.tripadvisor.com/Search?q=Gasthof+Walther+Klausen"] },
+          { type: "photo", tag: "Foto-Spot", text: "Von der Brücke über den Eisack: Klausen mit Kloster Säben oben drauf. Postkartenmotiv.", links: ["Google:https://www.google.com/search?q=Klausen+Eisack+Brücke+Foto+Säben"] },
+        ]
+      },
+      {
+        name: "Bozen / Bolzano",
+        meta: "82 km · 14:30 Uhr · Ankunft",
+        desc: "Hauptstadt Südtirols – Waltherplatz, Laubengasse, Ötzi im Museum. Die wärmste Stadt der Tour, hier weht schon mediterranes Flair.",
+        tips: [
+          { type: "tip", tag: "Insider", text: "Die Laubengasse ist Europas längste Einkaufsarkade. Nicht die Geschäfte, sondern die Deckenmalereien über den Läden sind sehenswert.", links: ["Google:https://www.google.com/search?q=Laubengasse+Bozen+Arkaden", "Wikipedia:https://de.wikipedia.org/wiki/Bozner_Lauben"] },
+          { type: "hidden", tag: "Geheimtipp", text: "Castel Flavon (20 min Vespa bergauf): Restaurant in einer Ruine mit dem besten Blick über Bozen. Abends buchen!", links: ["Google Maps:https://www.google.com/maps/search/Castel+Flavon+Bozen", "Tripadvisor:https://www.tripadvisor.com/Search?q=Castel+Flavon+Bozen", "Booking:https://www.booking.com/searchresults.html?ss=Castel+Flavon+Bozen"] },
+          { type: "food", tag: "Einkehr", text: "Batzenhäusl – ältestes Wirtshaus Bozens, seit 1404. Tris di Canederli (drei Knödel) mit Südtiroler Wein.", links: ["Google Maps:https://www.google.com/maps/search/Batzenhäusl+Bozen", "Tripadvisor:https://www.tripadvisor.com/Search?q=Batzenhäusl+Bozen"] },
+        ],
+        accom: {
+          name: "Kolpinghaus Bozen",
+          meta: "★★★ · ab €55/Nacht · Altstadt · Vespa auf dem Piazza parken",
+          tips: "Abends: Waltherplatz – Aperol Spritz auf dem Platz ist Pflicht. Morgens: Obstmarkt ab 7 Uhr – frisches Obst für die Dolomiten-Etappe mitnehmen."
+        }
+      }
+    ],
+    hints: [
+      { icon: "⛽", title: "Nur Abfahrt – wenig Verbrauch", text: "Vom Brenner (1370m) nach Bozen (262m) sind's über 1100m Abfahrt. Vespa braucht fast keinen Sprit. Aber: Bremsen werden heiß!", tag: "fuel" },
+      { icon: "⛰️", title: "Lange Abfahrt: Bremsen-Check", text: "1100m Höhenunterschied auf 82 km. Motor-Bremswirkung nutzen (2. Gang). Alle 20 min kurz anhalten und Bremsen abkühlen lassen.", tag: "danger" },
+      { icon: "🌡️", title: "Temperaturanstieg: +14°C", text: "Brenner (1370m): 12°C → Bozen (262m): 26°C. Die wärmste Etappe. Trinkwasser nicht vergessen!", tag: "warn" },
+      { icon: "🚧", title: "SS12 vs. Schnellstraße", text: "Die SS12 (alte Staatsstraße) ist für Vespa ideal – aber teils eng und Radfahrer-reich. Geduld mitbringen, nicht überholen wo's eng ist.", tag: "info" },
+    ],
+    heightProfile: [
+      { label: "BREN", height: 1370, max: 2200 },
+      { label: "Sterz", height: 950, max: 2200 },
+      { label: "Franz", height: 750, max: 2200 },
+      { label: "Brixen", height: 560, max: 2200 },
+      { label: "Klaus", height: 520, max: 2200 },
+      { label: "Waid", height: 470, max: 2200 },
+      { label: "Blum", height: 340, max: 2200 },
+      { label: "BOZ", height: 262, max: 2200 },
+    ],
+    countryInfo: [
+      { flag: "🇮🇹", name: "IT", maut: "frei (Landstr.)" },
+    ],
+    mapStops: [
+      { name: "Brenner", lng: 11.507, lat: 47.000 },
+      { name: "Sterzing", lng: 11.432, lat: 46.893 },
+      { name: "Franzensfeste", lng: 11.630, lat: 46.798 },
+      { name: "Klausen", lng: 11.562, lat: 46.641 },
+      { name: "Bozen", lng: 11.354, lat: 46.498 },
+    ]
+  },
+  4: {
+    title: "Bozen → Dolomiten",
+    meta: "105 km · ~4.5h · 4 Stopps",
+    countries: "🇮🇹",
+    budget: { fuel: 14, food: 40, sleep: 60 },
+    weather: [
+      { time: "07:00", icon: "🌤️", temp: "14°" },
+      { time: "10:00", icon: "☀️", temp: "20°" },
+      { time: "13:00", icon: "⛅", temp: "15°" },
+      { time: "16:00", icon: "🌤️", temp: "18°" },
+    ],
+    stops: [
+      {
+        name: "St. Ulrich / Ortisei (Grödnertal)",
+        meta: "38 km · 09:00 Uhr · 45 min",
+        desc: "Hauptort des Grödnertals – berühmt für Holzschnitzerei und als Wintersport-Hotspot. Im Sommer angenehm leer.",
+        tips: [
+          { type: "tip", tag: "Insider", text: "In den Werkstätten der Holzschnitzer kann man zusehen. Uniag (Via Rezia 69) lässt Besucher kostenlos in die Werkstatt.", links: ["Google Maps:https://www.google.com/maps/search/Uniag+Holzschnitzerei+St+Ulrich", "Google:https://www.google.com/search?q=Holzschnitzerei+St+Ulrich+Grödnertal"] },
+          { type: "food", tag: "Einkehr", text: "Anna Stuben: Michelin-Empfehlung, aber entspannte Atmosphäre. Wildragout mit Polenta – Dolomiten auf dem Teller.", links: ["Google Maps:https://www.google.com/maps/search/Anna+Stuben+St+Ulrich", "Tripadvisor:https://www.tripadvisor.com/Search?q=Anna+Stuben+St+Ulrich+Gröden"] },
+          { type: "photo", tag: "Foto-Spot", text: "Die Gondel-Talstation hat einen freien Blick auf den Langkofel. Morgens gegen 9 Uhr ist das Licht perfekt.", links: ["Google:https://www.google.com/search?q=Langkofel+St+Ulrich+Foto"] },
+        ]
+      },
+      {
+        name: "Grödner Joch / Passo Gardena (2.121m)",
+        meta: "58 km · 10:30 Uhr · 30 min",
+        desc: "Der erste richtige Dolomiten-Pass! Die Vespa kämpft sich hoch – aber die Aussicht auf Sellagruppe und Langkofel ist es wert.",
+        tips: [
+          { type: "hidden", tag: "Geheimtipp", text: "Wenn du vor 8:30 Uhr oben bist, hast du den Pass fast für dich allein. Die Reisebusse kommen erst ab 10 Uhr.", links: [] },
+          { type: "photo", tag: "Foto-Spot", text: "Am Parkplatz auf der Passhöhe: Vespa mit Sellagruppe im Hintergrund. DAS Dolomiten-Bild.", links: ["Google:https://www.google.com/search?q=Grödner+Joch+Panorama+Foto"] },
+          { type: "nature", tag: "Natur", text: "5 min zu Fuß vom Parkplatz: Blick in beide Täler gleichzeitig. Murmeltiere sind hier morgens aktiv.", links: ["Google:https://www.google.com/search?q=Grödner+Joch+Murmeltiere+Wanderung"] },
+        ]
+      },
+      {
+        name: "Corvara (Alta Badia)",
+        meta: "72 km · 12:00 Uhr · 60 min Mittagspause",
+        desc: "Abfahrt vom Grödner Joch ins Gaderthal. Corvara ist das Herz der ladinischen Kultur – hier spricht man die vierte Sprache Südtirols.",
+        tips: [
+          { type: "tip", tag: "Insider", text: "Museum Ladin (5 min zu Fuß): Die ladinische Sprache und Kultur erklärt. Überraschend spannend, auch für Nicht-Linguisten.", links: ["Google:https://www.google.com/search?q=Museum+Ladin+Corvara", "Wikipedia:https://de.wikipedia.org/wiki/Ladinische_Sprache"] },
+          { type: "food", tag: "Einkehr", text: "Rifugio Scotoni: per Jeep-Shuttle erreichbar oder 40 min Wanderung. Knödel mit Bergkäse auf 2000m. Reservierung empfohlen.", links: ["Google Maps:https://www.google.com/maps/search/Rifugio+Scotoni+Corvara", "Tripadvisor:https://www.tripadvisor.com/Search?q=Rifugio+Scotoni"] },
+          { type: "hidden", tag: "Geheimtipp", text: "Der Klettersteig 'Tridentina' startet hier – für Nicht-Kletterer: der Einstieg allein ist schon ein Erlebnis (10 min, gratis).", links: ["Google:https://www.google.com/search?q=Klettersteig+Tridentina+Corvara"] },
+        ]
+      },
+      {
+        name: "Valparola Pass (2.192m)",
+        meta: "105 km · 15:00 Uhr · Ankunft",
+        desc: "Der höchste Punkt der gesamten Tour! Ein ehemaliger Festungspass aus dem 1. Weltkrieg. Hier endet die Tagesetappe.",
+        tips: [
+          { type: "photo", tag: "Foto-Spot", text: "Altes Fort auf der Passhöhe – die Vespa vor dem Bunker-Eingang parken. Dramatisch und geschichtsträchtig.", links: ["Google:https://www.google.com/search?q=Valparola+Pass+Fort+Foto", "Wikipedia:https://de.wikipedia.org/wiki/Valparolapass"] },
+          { type: "tip", tag: "Insider", text: "Im Kriegsmuseum im Fort (€5) wird der Gebirgskrieg 1915-18 erklärt. Berührend und wichtig für den Kontext der Dolomiten.", links: ["Google Maps:https://www.google.com/maps/search/Kriegsmuseum+Valparola+Pass"] },
+          { type: "nature", tag: "Natur", text: "Der kleine See direkt unter dem Pass (Lago di Valparola) schimmert türkis. Magischer Ort bei Sonnenuntergang.", links: ["Google:https://www.google.com/search?q=Lago+di+Valparola+See"] },
+        ],
+        accom: {
+          name: "Rifugio Valparola",
+          meta: "★★ · ab €60/Nacht · direkt am Pass · Vespa in der Garage",
+          tips: "Abends: Sonnenuntergang über den Dolomiten vom Fort aus – zieh alles Warme an, es werden 5°C. Morgens: Die Abfahrt Richtung Cortina ist um 7 Uhr ein Traum."
+        }
+      }
+    ],
+    hints: [
+      { icon: "⛽", title: "KRITISCH: Tankreichweite!", text: "Steigungen fressen Sprit! Bozen bis St. Ulrich VOLL tanken. Nächste Tankstelle erst Corvara (72 km, davon 2 Pässe). Im Gebirge sinkt Reichweite auf ~70 km!", tag: "danger" },
+      { icon: "⛰️", title: "Grödner Joch: 2.121m", text: "Steilste Passage der Tour (~10%). Vespa im 1./2. Gang. NICHT am Rand halten – kein Seitenstreifen. Oben 10 min Pause gönnen, Motor abkühlen.", tag: "danger" },
+      { icon: "🌡️", title: "Extremer Temperaturwechsel", text: "Bozen (262m): 26°C → Grödner Joch (2121m): 10°C → Corvara: 18°C → Valparola (2192m): 8°C. 4x umziehen an einem Tag!", tag: "warn" },
+      { icon: "⛰️", title: "Valparola: 2.192m – höchster Punkt", text: "Die letzten 5 km sind steil. Bei Nebel (häufig ab 15 Uhr) Nebelschlussleuchte an. Im Schatten kann es Wasserfilm auf der Straße geben.", tag: "danger" },
+    ],
+    heightProfile: [
+      { label: "BOZ", height: 262, max: 2200 },
+      { label: "Ulrich", height: 1240, max: 2200 },
+      { label: "GröJo", height: 2121, max: 2200 },
+      { label: "Corv", height: 1568, max: 2200 },
+      { label: "Stei", height: 1700, max: 2200 },
+      { label: "Prelo", height: 1900, max: 2200 },
+      { label: "Fort", height: 2100, max: 2200 },
+      { label: "VALP", height: 2192, max: 2200 },
+    ],
+    countryInfo: [
+      { flag: "🇮🇹", name: "IT", maut: "frei (Pässe)" },
+    ],
+    mapStops: [
+      { name: "Bozen", lng: 11.354, lat: 46.498 },
+      { name: "St. Ulrich", lng: 11.672, lat: 46.574 },
+      { name: "Grödner Joch", lng: 11.810, lat: 46.553 },
+      { name: "Corvara", lng: 11.874, lat: 46.550 },
+      { name: "Valparola", lng: 11.930, lat: 46.528 },
+    ]
+  },
+  5: {
+    title: "Dolomiten → Gardasee",
+    meta: "90 km · ~3.5h · 4 Stopps",
+    countries: "🇮🇹",
+    budget: { fuel: 10, food: 38, sleep: 48 },
+    weather: [
+      { time: "07:00", icon: "🌤️", temp: "8°" },
+      { time: "10:00", icon: "☀️", temp: "22°" },
+      { time: "13:00", icon: "☀️", temp: "28°" },
+      { time: "16:00", icon: "🌤️", temp: "26°" },
+    ],
+    stops: [
+      {
+        name: "Cortina d'Ampezzo",
+        meta: "25 km · 08:30 Uhr · 45 min",
+        desc: "Die 'Königin der Dolomiten' – glamourös, teuer, aber auch ohne Ausgaben wunderschön. Olympia-Ort 2026!",
+        tips: [
+          { type: "tip", tag: "Insider", text: "Im Corso Italia (Fußgängerzone) stehen morgens fast keine Touristen. Die Boutiquen öffnen erst um 10 – vorher hat man das Dolomitengebirge als Kulisse fast für sich.", links: ["Google Maps:https://www.google.com/maps/search/Corso+Italia+Cortina", "Wikipedia:https://de.wikipedia.org/wiki/Cortina_d'Ampezzo"] },
+          { type: "photo", tag: "Foto-Spot", text: "Vom Kirchturm-Platz: Blick auf die Tofane-Gruppe. Bei klarem Wetter sieht man die Cinque Torri.", links: ["Google:https://www.google.com/search?q=Cortina+Tofane+Panorama+Foto"] },
+          { type: "food", tag: "Einkehr", text: "Bar Embassy: Espresso für €1.20 (yes, auch in Cortina!). Stehbar am Tresen wie ein Einheimischer.", links: ["Google Maps:https://www.google.com/maps/search/Bar+Embassy+Cortina", "Tripadvisor:https://www.tripadvisor.com/Search?q=Bar+Embassy+Cortina"] },
+        ]
+      },
+      {
+        name: "Pieve di Cadore",
+        meta: "45 km · 10:30 Uhr · 30 min",
+        desc: "Geburtsort von Tizian. Ein ruhiges Bergstädtchen mit einem überraschend guten Museum und tollem Seeblick.",
+        tips: [
+          { type: "hidden", tag: "Geheimtipp", text: "Casa di Tiziano (Tizians Geburtshaus): €3 Eintritt, oft komplett leer. Die Nachbarin verkauft handgemachten Käse.", links: ["Google:https://www.google.com/search?q=Casa+di+Tiziano+Pieve+di+Cadore", "Wikipedia:https://de.wikipedia.org/wiki/Pieve_di_Cadore"] },
+          { type: "nature", tag: "Natur", text: "Lago di Centro Cadore – der See schimmert smaragdgrün. Kurzer Stopp am Ufer, einfach gucken.", links: ["Google:https://www.google.com/search?q=Lago+Centro+Cadore"] },
+          { type: "tip", tag: "Insider", text: "Ab hier beginnt die SS51 Richtung Belluno – eine der schönsten Motorradstrecken Italiens. Vespa-tauglich, wenig Verkehr.", links: ["Google:https://www.google.com/search?q=SS51+Belluno+Motorradstrecke"] },
+        ]
+      },
+      {
+        name: "Feltre",
+        meta: "68 km · 12:30 Uhr · 60 min Mittagspause",
+        desc: "Unterschätzte Renaissance-Stadt am Fuß der Berge. Hier wird's warm, mediterran, und die Pizza wird plötzlich besser als jede nördlich der Alpen.",
+        tips: [
+          { type: "tip", tag: "Insider", text: "Piazza Maggiore: einer der schönsten Renaissance-Plätze Venetiens, fast unbekannt. Donnerstags ist Markt.", links: ["Google:https://www.google.com/search?q=Piazza+Maggiore+Feltre", "Wikipedia:https://de.wikipedia.org/wiki/Feltre"] },
+          { type: "food", tag: "Einkehr", text: "Osteria Novecento: Mittagsmenü (Primo+Secondo+Caffè) für ~€14. Authentisch, lokal, keine Touristen.", links: ["Google Maps:https://www.google.com/maps/search/Osteria+Novecento+Feltre", "Tripadvisor:https://www.tripadvisor.com/Search?q=Osteria+Novecento+Feltre"] },
+          { type: "hidden", tag: "Geheimtipp", text: "Das Museo Rizzarda hat die beste Jugendstil-Schmiedekunst Norditaliens. €4, 20 min reichen.", links: ["Google:https://www.google.com/search?q=Museo+Rizzarda+Feltre"] },
+        ]
+      },
+      {
+        name: "Riva del Garda",
+        meta: "90 km · 15:30 Uhr · Ankunft",
+        desc: "ZIEL! Der Gardasee liegt vor dir. Nach 5 Tagen Alpenüberquerung hast du dir das erste Gelato verdient.",
+        tips: [
+          { type: "photo", tag: "Foto-Spot", text: "Von der Bastione (alte Festung, 15 min Aufstieg): DER Blick über den Gardasee. Vespa unten am Hafen parken.", links: ["Google:https://www.google.com/search?q=Bastione+Riva+del+Garda+Aussicht", "Google Maps:https://www.google.com/maps/search/Bastione+Riva+del+Garda"] },
+          { type: "hidden", tag: "Geheimtipp", text: "Ponale-Straße: alte Militärstraße in die Felswand gebaut. Heute nur Fußgänger/Radler – 10 min zu Fuß rein lohnt sich absolut!", links: ["Google:https://www.google.com/search?q=Ponale+Straße+Riva+del+Garda", "Wikipedia:https://de.wikipedia.org/wiki/Strada_del_Ponale"] },
+          { type: "food", tag: "Einkehr", text: "Gelateria Flora: Bestes Eis in Riva. Pistazie und Nocciola. Iss es am Hafen mit Blick auf den See.", links: ["Google Maps:https://www.google.com/maps/search/Gelateria+Flora+Riva+del+Garda", "Tripadvisor:https://www.tripadvisor.com/Search?q=Gelateria+Flora+Riva+del+Garda"] },
+        ],
+        accom: {
+          name: "Hotel Portici",
+          meta: "★★★ · ab €48/Nacht · Altstadt am Hafen · Vespa am Piazza",
+          tips: "Abends: Aperitivo an der Seepromenade – du hast es geschafft! Morgens: Markt am Mittwoch, Fischstand für frische Sardinen."
+        }
+      }
+    ],
+    hints: [
+      { icon: "⛽", title: "Letzte Tankstelle: Cortina", text: "Vor Cortina volltanken. Bis Pieve di Cadore gibt's noch eine kleine Tankstelle, aber die SS51 Richtung Feltre hat Lücken.", tag: "fuel" },
+      { icon: "⛰️", title: "Abfahrt: 2.192m → 65m", text: "Über 2.100 Höhenmeter Abstieg heute! Die längste Abfahrt der Tour. Bremsen-Check: morgens vor Abfahrt kalt prüfen.", tag: "warn" },
+      { icon: "🌡️", title: "Temperatur: von 8°C auf 28°C", text: "20 Grad Unterschied! Start: alles anziehen. Spätestens Feltre alles ausziehen. Am Gardasee: Sommer!", tag: "warn" },
+      { icon: "🏷️", title: "ZTL-Zonen in Riva!", text: "Riva del Garda hat Fahrverbotszonen (ZTL) im Zentrum. Motorräder oft ausgenommen – aber prüfe die Schilder! Strafe: €80+.", tag: "danger" },
+    ],
+    heightProfile: [
+      { label: "VALP", height: 2192, max: 2200 },
+      { label: "Cort", height: 1224, max: 2200 },
+      { label: "Pieve", height: 878, max: 2200 },
+      { label: "Long", height: 474, max: 2200 },
+      { label: "Feltre", height: 325, max: 2200 },
+      { label: "Prim", height: 220, max: 2200 },
+      { label: "Arco", height: 91, max: 2200 },
+      { label: "RIVA", height: 65, max: 2200 },
+    ],
+    countryInfo: [
+      { flag: "🇮🇹", name: "IT", maut: "frei + ZTL!" },
+    ],
+    mapStops: [
+      { name: "Valparola", lng: 11.930, lat: 46.528 },
+      { name: "Cortina", lng: 12.136, lat: 46.537 },
+      { name: "Pieve", lng: 12.376, lat: 46.428 },
+      { name: "Feltre", lng: 11.909, lat: 46.018 },
+      { name: "Riva", lng: 10.842, lat: 45.886 },
+    ]
+  }
+};
+
+// ═══════ RENDER FUNCTIONS ═══════
+
+function renderStops(day) {
+  const d = tourData[day];
+  let html = '';
+  d.stops.forEach((stop, i) => {
+    html += `<div class="stop-card">
+      <div class="stop-title"><span class="stop-num">${i+1}</span>${stop.name}</div>
+      <div class="stop-meta">${stop.meta}</div>
+      <div class="stop-desc">${stop.desc}</div>
+      <div class="tips-list">`;
+    stop.tips.forEach(tip => {
+      const tagClass = tip.type === 'tip' ? 'tag-tip' : tip.type === 'photo' ? 'tag-photo' : tip.type === 'hidden' ? 'tag-hidden' : tip.type === 'food' ? 'tag-food' : 'tag-nature';
+      const tipClass = `tip-${tip.type}`;
+      let linksHtml = '';
+      if (tip.links && tip.links.length > 0) {
+        linksHtml = '<div class="tip-links">';
+        tip.links.forEach(link => {
+          const [label, url] = link.split(':https://');
+          const icon = label === 'Google Maps' ? '📍' : label === 'Wikipedia' ? '📖' : label === 'Tripadvisor' ? '⭐' : label === 'Booking' ? '🏨' : label === 'Google' ? '🔍' : '🔗';
+          linksHtml += `<a class="tip-link" href="https://${url}" target="_blank" rel="noopener"><span class="link-icon">${icon}</span>${label}</a>`;
+        });
+        linksHtml += '</div>';
+      }
+      html += `<div class="tip ${tipClass}">
+        <span class="tip-tag ${tagClass}">${tip.tag}</span>
+        <div class="tip-content">
+          <div class="tip-text">${tip.text}</div>
+          ${linksHtml}
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+    if (stop.accom) {
+      html += `<div class="accom-card">
+        <div class="accom-title">🛏️ ${stop.accom.name}</div>
+        <div class="accom-meta">${stop.accom.meta}</div>
+        <div class="accom-tips">${stop.accom.tips}</div>
+      </div>`;
+    }
+    html += '</div>';
+  });
+  return html;
+}
+
+function renderHints(day) {
+  const d = tourData[day];
+  let html = '';
+  d.hints.forEach(hint => {
+    html += `<div class="hint">
+      <div class="hint-icon">${hint.icon}</div>
+      <div class="hint-content">
+        <div class="hint-title">${hint.title}</div>
+        <div class="hint-text">${hint.text}</div>
+      </div>
+      <span class="hint-tag ${hint.tag}">${hint.tag === 'fuel' ? 'Tanken' : hint.tag === 'warn' ? 'Achtung' : hint.tag === 'danger' ? 'Warnung' : 'Info'}</span>
+    </div>`;
+  });
+  // Height profile
+  html += '<div class="height-profile"><div class="height-profile-title">📊 Höhenprofil</div><div class="height-bars">';
+  d.heightProfile.forEach(p => {
+    const pct = Math.max(8, (p.height / p.max) * 100);
+    const cls = p.height > 1800 ? 'high' : p.height > 1000 ? 'mid' : 'low';
+    html += `<div class="height-bar ${cls}" style="height:${pct}%" title="${p.label}: ${p.height}m"></div>`;
+  });
+  html += '</div><div class="height-labels">';
+  d.heightProfile.forEach(p => {
+    html += `<div class="height-label">${p.label}</div>`;
+  });
+  html += '</div></div>';
+  // Countries
+  html += '<div class="countries-bar">';
+  d.countryInfo.forEach(c => {
+    html += `<div class="country-chip"><span class="flag">${c.flag}</span><span>${c.name}</span><span class="maut">${c.maut}</span></div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderMap(day) {
+  // No longer returns HTML - handled by initMapbox
+}
+
+function renderTotalMap() {
+  // No longer returns HTML - handled by initTotalMapbox
+}
+
+// ═══════ MAPBOX ═══════
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  HIER DEINEN MAPBOX TOKEN EINSETZEN (Zeile unten):  ║
+// ╚══════════════════════════════════════════════════════╝
+mapboxgl.accessToken = 'pk.eyJ1Ijoicm9zY2gtbGFiIiwiYSI6ImNtbHM2Z2tkajAzMmYzY3Nibmx5cHN5ajMifQ.GFMVi5HiIZiGCf7PdmxkYQ';
+
+let dayMap = null;
+let totalMap = null;
+
+function initDayMap(day) {
+  const d = tourData[day];
+  const stops = d.mapStops;
+  const container = document.getElementById('mapCanvas');
+  container.innerHTML = '';
+
+  // Remove old map instance
+  if (dayMap) { dayMap.remove(); dayMap = null; }
+
+  // Calculate bounds to fit all stops
+  const bounds = new mapboxgl.LngLatBounds();
+  stops.forEach(s => bounds.extend([s.lng, s.lat]));
+
+  dayMap = new mapboxgl.Map({
+    container: 'mapCanvas',
+    style: 'mapbox://styles/mapbox/outdoors-v12',
+    bounds: bounds,
+    fitBoundsOptions: { padding: 40 },
+    attributionControl: false
+  });
+
+  dayMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  dayMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
+
+  dayMap.on('load', () => {
+    // Fetch real route from Mapbox Directions API
+    // Build waypoints string: lng,lat;lng,lat;...
+    const waypoints = stops.map(s => `${s.lng},${s.lat}`).join(';');
+    const profile = 'mapbox/driving';
+    const exclude = 'motorway'; // Vespa: keine Autobahn!
+    const url = `https://api.mapbox.com/directions/v5/${profile}/${waypoints}?geometries=geojson&overview=full&exclude=${exclude}&access_token=${mapboxgl.accessToken}`;
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.routes && data.routes[0]) {
+          const route = data.routes[0].geometry;
+
+          dayMap.addSource('route', {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: route }
+          });
+          // Route shadow
+          dayMap.addLayer({
+            id: 'route-shadow',
+            type: 'line',
+            source: 'route',
+            paint: {
+              'line-color': '#000',
+              'line-width': 6,
+              'line-opacity': 0.12,
+              'line-blur': 4
+            }
+          });
+          // Route line
+          dayMap.addLayer({
+            id: 'route-line',
+            type: 'line',
+            source: 'route',
+            paint: {
+              'line-color': '#c8702a',
+              'line-width': 4,
+              'line-cap': 'round',
+              'line-join': 'round'
+            }
+          });
+
+          // Fit map to route bounds
+          const coords = route.coordinates;
+          const routeBounds = new mapboxgl.LngLatBounds();
+          coords.forEach(c => routeBounds.extend(c));
+          dayMap.fitBounds(routeBounds, { padding: 40 });
+        }
+      })
+      .catch(err => {
+        console.warn('Directions API error, falling back to straight line:', err);
+        // Fallback: straight line
+        const routeCoords = stops.map(s => [s.lng, s.lat]);
+        dayMap.addSource('route', {
+          type: 'geojson',
+          data: { type: 'Feature', geometry: { type: 'LineString', coordinates: routeCoords } }
+        });
+        dayMap.addLayer({
+          id: 'route-line', type: 'line', source: 'route',
+          paint: { 'line-color': '#c8702a', 'line-width': 3, 'line-dasharray': [2, 1] }
+        });
+      });
+
+    // Stop markers
+    stops.forEach((s, i) => {
+      const isFirst = i === 0;
+      const isLast = i === stops.length - 1;
+      const color = isFirst ? '#3d6b4f' : isLast ? '#c45c4a' : '#2c3e2d';
+      const size = isFirst || isLast ? 14 : 10;
+
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width: ${size}px; height: ${size}px;
+        background: ${color}; border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        cursor: pointer;
+      `;
+
+      const popup = new mapboxgl.Popup({ offset: 12, closeButton: false })
+        .setHTML(`<div style="font-family:DM Sans,sans-serif;font-size:12px;">
+          <strong>${s.name}</strong><br>
+          <span style="color:#6b6b6b;">Stopp ${i+1} von ${stops.length}</span>
+        </div>`);
+
+      new mapboxgl.Marker({ element: el })
+        .setLngLat([s.lng, s.lat])
+        .setPopup(popup)
+        .addTo(dayMap);
+    });
+  });
+}
+
+function initTotalMap() {
+  const container = document.getElementById('totalMapCanvas');
+  container.innerHTML = '';
+
+  if (totalMap) { totalMap.remove(); totalMap = null; }
+
+  const colors = ['#c8702a', '#3d6b4f', '#5b8ab5', '#7b5a9e', '#c45c4a'];
+  const allStops = [
+    { name: "München", lng: 11.576, lat: 48.137 },
+    { name: "Kochel", lng: 11.369, lat: 47.659 },
+    { name: "Mittenwald", lng: 11.264, lat: 47.442 },
+    { name: "Innsbruck", lng: 11.394, lat: 47.269 },
+    { name: "Brenner", lng: 11.507, lat: 47.000 },
+    { name: "Sterzing", lng: 11.432, lat: 46.893 },
+    { name: "Bozen", lng: 11.354, lat: 46.498 },
+    { name: "St. Ulrich", lng: 11.672, lat: 46.574 },
+    { name: "Grödner Joch", lng: 11.810, lat: 46.553 },
+    { name: "Valparola", lng: 11.930, lat: 46.528 },
+    { name: "Cortina", lng: 12.136, lat: 46.537 },
+    { name: "Feltre", lng: 11.909, lat: 46.018 },
+    { name: "Riva", lng: 10.842, lat: 45.886 },
+  ];
+  const daySegments = [
+    [0,1,2,3], [3,4], [4,5,6], [6,7,8,9], [9,10,11,12]
+  ];
+
+  const bounds = new mapboxgl.LngLatBounds();
+  allStops.forEach(s => bounds.extend([s.lng, s.lat]));
+
+  totalMap = new mapboxgl.Map({
+    container: 'totalMapCanvas',
+    style: 'mapbox://styles/mapbox/outdoors-v12',
+    bounds: bounds,
+    fitBoundsOptions: { padding: 30 },
+    attributionControl: false
+  });
+
+  totalMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  totalMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
+
+  totalMap.on('load', () => {
+    // Fetch real routes for each day segment
+    const exclude = 'motorway';
+    daySegments.forEach((seg, di) => {
+      const waypoints = seg.map(idx => `${allStops[idx].lng},${allStops[idx].lat}`).join(';');
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${waypoints}?geometries=geojson&overview=full&exclude=${exclude}&access_token=${mapboxgl.accessToken}`;
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (data.routes && data.routes[0]) {
+            totalMap.addSource(`route-${di}`, {
+              type: 'geojson',
+              data: { type: 'Feature', geometry: data.routes[0].geometry }
+            });
+            totalMap.addLayer({
+              id: `route-shadow-${di}`,
+              type: 'line',
+              source: `route-${di}`,
+              paint: { 'line-color': '#000', 'line-width': 5, 'line-opacity': 0.08, 'line-blur': 3 }
+            });
+            totalMap.addLayer({
+              id: `route-${di}`,
+              type: 'line',
+              source: `route-${di}`,
+              paint: {
+                'line-color': colors[di],
+                'line-width': 3.5,
+                'line-cap': 'round',
+                'line-join': 'round',
+                'line-opacity': 0.85
+              }
+            });
+          }
+        })
+        .catch(err => {
+          // Fallback: straight line
+          const coords = seg.map(idx => [allStops[idx].lng, allStops[idx].lat]);
+          totalMap.addSource(`route-${di}`, {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } }
+          });
+          totalMap.addLayer({
+            id: `route-${di}`, type: 'line', source: `route-${di}`,
+            paint: { 'line-color': colors[di], 'line-width': 3, 'line-dasharray': [2, 1] }
+          });
+        });
+    });
+
+    // Stop markers
+    allStops.forEach((s, i) => {
+      const isEndpoint = i === 0 || i === allStops.length - 1;
+      const size = isEndpoint ? 12 : 8;
+      const color = isEndpoint ? '#c45c4a' : '#2c3e2d';
+
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width: ${size}px; height: ${size}px;
+        background: ${color}; border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        cursor: pointer;
+      `;
+
+      const popup = new mapboxgl.Popup({ offset: 10, closeButton: false })
+        .setHTML(`<div style="font-family:DM Sans,sans-serif;font-size:12px;">
+          <strong>${s.name}</strong>
+        </div>`);
+
+      new mapboxgl.Marker({ element: el })
+        .setLngLat([s.lng, s.lat])
+        .setPopup(popup)
+        .addTo(totalMap);
+    });
+  });
+}
+
+// ═══════ NAVIGATION ═══════
+
+let currentDay = 1;
+
+function switchDay(day) {
+  // Update pills
+  document.querySelectorAll('.day-pill').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.day-pill[data-day="${day}"]`).classList.add('active');
+
+  if (day === 'total') {
+    document.getElementById('tilesView').style.display = 'none';
+    document.getElementById('totalView').classList.add('active');
+    setTimeout(() => initTotalMap(), 50);
+    return;
+  }
+
+  document.getElementById('tilesView').style.display = 'flex';
+  document.getElementById('totalView').classList.remove('active');
+  currentDay = day;
+  const d = tourData[day];
+
+  // Update Tile A
+  document.getElementById('tileATitle').textContent = d.title;
+  document.getElementById('tileAMeta').textContent = d.meta;
+  document.getElementById('tileABody').innerHTML = renderStops(day);
+
+  // Budget
+  document.getElementById('budgetFuel').textContent = `€${d.budget.fuel}`;
+  document.getElementById('budgetFood').textContent = `€${d.budget.food}`;
+  document.getElementById('budgetSleep').textContent = `€${d.budget.sleep}`;
+  document.getElementById('budgetTotal').textContent = `Σ €${d.budget.fuel + d.budget.food + d.budget.sleep}`;
+
+  // Tile B: Mapbox
+  document.getElementById('tileBCountry').textContent = d.countries;
+  setTimeout(() => initDayMap(day), 50);
+
+  // Tile C: Hints
+  document.getElementById('tileCBody').innerHTML = renderHints(day);
+}
+
+// Initial render
+switchDay(1);
+
+// ═══════ DRAG RESIZE ═══════
+// Generic drag handler for resizable panels
+
+function initDragResize(handleId, beforeId, afterId, direction) {
+  const handle = document.getElementById(handleId);
+  const before = document.getElementById(beforeId);
+  const after = document.getElementById(afterId);
+  if (!handle || !before || !after) return;
+
+  let startPos, startBeforeSize, startAfterSize, totalSize;
+
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    handle.classList.add('active');
+    document.body.style.cursor = direction === 'h' ? 'col-resize' : 'row-resize';
+    document.body.style.userSelect = 'none';
+
+    if (direction === 'h') {
+      startPos = e.clientX;
+      startBeforeSize = before.getBoundingClientRect().width;
+      startAfterSize = after.getBoundingClientRect().width;
+    } else {
+      startPos = e.clientY;
+      startBeforeSize = before.getBoundingClientRect().height;
+      startAfterSize = after.getBoundingClientRect().height;
+    }
+    totalSize = startBeforeSize + startAfterSize;
+
+    function onMove(e) {
+      const delta = direction === 'h' ? e.clientX - startPos : e.clientY - startPos;
+      const newBefore = Math.max(120, Math.min(totalSize - 120, startBeforeSize + delta));
+      const newAfter = totalSize - newBefore;
+
+      before.style.flex = 'none';
+      after.style.flex = 'none';
+      if (direction === 'h') {
+        before.style.width = newBefore + 'px';
+        after.style.width = newAfter + 'px';
+      } else {
+        before.style.height = newBefore + 'px';
+        after.style.height = newAfter + 'px';
+      }
+
+      // Resize Mapbox maps if visible
+      if (dayMap) dayMap.resize();
+      if (totalMap) totalMap.resize();
+    }
+
+    function onUp() {
+      handle.classList.remove('active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+// Day view: left/right split + map/hints split
+initDragResize('dragH1', 'tilesLeft', 'tilesRight', 'h');
+initDragResize('dragV1', 'tileB', 'tileC', 'v');
+
+// Total view: left/right split + map/tips split
+initDragResize('dragH2', 'totalLeft', 'totalRight', 'h');
+// For total right map/tips, we need the tile IDs
+(function() {
+  const rightTiles = document.querySelectorAll('#totalRight > .tile');
+  if (rightTiles.length >= 2) {
+    rightTiles[0].id = 'totalMapTile';
+    rightTiles[1].id = 'totalTipsTile';
+    initDragResize('dragV2', 'totalMapTile', 'totalTipsTile', 'v');
+  }
+})();
+</script>
+</body>
+</html>
