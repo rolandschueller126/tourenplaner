@@ -1,7 +1,6 @@
 {
   "name": "tourenplaner",
   "version": "2.0.0",
-  "description": "Tourenplaner – Dein KI Agent für feine Touren | by rosch-lab",
-  "private": true,
-  "type": "module"
+  "description": "Tourenplaner - Dein KI Agent für feine Touren | by rosch-lab",
+  "private": true
 }
