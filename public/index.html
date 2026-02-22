@@ -1625,14 +1625,18 @@ function renderStops(day) {
   const d = tourData[day];
   let html = '';
   d.stops.forEach((stop, i) => {
+    // Bug-Fix: stop.meta aus km/time/duration zusammenbauen falls nicht vorhanden
+    const meta = stop.meta || [stop.km, stop.time, stop.duration].filter(Boolean).join(' · ') || '';
     html += `<div class="stop-card">
       <div class="stop-title"><span class="stop-num">${i+1}</span>${stop.name}</div>
-      <div class="stop-meta">${stop.meta}</div>
-      <div class="stop-desc">${stop.desc}</div>
+      <div class="stop-meta">${meta}</div>
+      <div class="stop-desc">${stop.desc || ''}</div>
       <div class="tips-list">`;
-    stop.tips.forEach(tip => {
-      const tagClass = tip.type === 'tip' ? 'tag-tip' : tip.type === 'photo' ? 'tag-photo' : tip.type === 'hidden' ? 'tag-hidden' : tip.type === 'food' ? 'tag-food' : 'tag-nature';
-      const tipClass = `tip-${tip.type}`;
+    (stop.tips || []).forEach(tip => {
+      // Bug-Fix: tip.tag aus tip.type ableiten falls nicht vorhanden
+      const resolvedTag = tip.tag || tip.type || 'info';
+      const tagClass = resolvedTag === 'insider' ? 'tag-tip' : resolvedTag === 'foto-spot' ? 'tag-photo' : resolvedTag === 'einkehr' ? 'tag-food' : resolvedTag === 'kultur' ? 'tag-hidden' : resolvedTag === 'natur' ? 'tag-nature' : resolvedTag === 'warnung' ? 'tag-warn' : 'tag-tip';
+      const tipClass = `tip-${tip.type || 'insider'}`;
       let linksHtml = '';
       if (tip.links && tip.links.length > 0) {
         linksHtml = '<div class="tip-links">';
@@ -1643,8 +1647,9 @@ function renderStops(day) {
         });
         linksHtml += '</div>';
       }
+      const tagLabel = resolvedTag === 'insider' ? 'Insider' : resolvedTag === 'foto-spot' ? 'Foto' : resolvedTag === 'einkehr' ? 'Einkehr' : resolvedTag === 'kultur' ? 'Kultur' : resolvedTag === 'natur' ? 'Natur' : resolvedTag === 'warnung' ? 'Achtung' : 'Tipp';
       html += `<div class="tip ${tipClass}">
-        <span class="tip-tag ${tagClass}">${tip.tag}</span>
+        <span class="tip-tag ${tagClass}">${tagLabel}</span>
         <div class="tip-content">
           <div class="tip-text">${tip.text}</div>
           ${linksHtml}
@@ -1667,34 +1672,44 @@ function renderStops(day) {
 function renderHints(day) {
   const d = tourData[day];
   let html = '';
-  d.hints.forEach(hint => {
+  // Bug-Fix: hints null-safe
+  (d.hints || []).forEach(hint => {
+    // Bug-Fix: hint.tag aus hint.severity ableiten falls nicht vorhanden
+    const resolvedTag = hint.tag || (hint.severity === 'warnung' ? 'warn' : hint.severity === 'achtung' ? 'danger' : 'fuel');
+    const tagLabel = resolvedTag === 'fuel' ? 'Tanken' : resolvedTag === 'warn' ? 'Achtung' : resolvedTag === 'danger' ? 'Warnung' : 'Info';
     html += `<div class="hint">
-      <div class="hint-icon">${hint.icon}</div>
+      <div class="hint-icon">${hint.icon || 'ℹ️'}</div>
       <div class="hint-content">
-        <div class="hint-title">${hint.title}</div>
-        <div class="hint-text">${hint.text}</div>
+        <div class="hint-title">${hint.title || ''}</div>
+        <div class="hint-text">${hint.text || ''}</div>
       </div>
-      <span class="hint-tag ${hint.tag}">${hint.tag === 'fuel' ? 'Tanken' : hint.tag === 'warn' ? 'Achtung' : hint.tag === 'danger' ? 'Warnung' : 'Info'}</span>
+      <span class="hint-tag ${resolvedTag}">${tagLabel}</span>
     </div>`;
   });
-  // Height profile
-  html += '<div class="height-profile"><div class="height-profile-title">📊 Höhenprofil</div><div class="height-bars">';
-  d.heightProfile.forEach(p => {
-    const pct = Math.max(8, (p.height / p.max) * 100);
-    const cls = p.height > 1800 ? 'high' : p.height > 1000 ? 'mid' : 'low';
-    html += `<div class="height-bar ${cls}" style="height:${pct}%" title="${p.label}: ${p.height}m"></div>`;
-  });
-  html += '</div><div class="height-labels">';
-  d.heightProfile.forEach(p => {
-    html += `<div class="height-label">${p.label}</div>`;
-  });
-  html += '</div></div>';
-  // Countries
-  html += '<div class="countries-bar">';
-  d.countryInfo.forEach(c => {
-    html += `<div class="country-chip"><span class="flag">${c.flag}</span><span>${c.name}</span><span class="maut">${c.maut}</span></div>`;
-  });
-  html += '</div>';
+  // Bug-Fix: Höhenprofil NUR anzeigen wenn echte Daten vorhanden (kein Fake!)
+  const heightData = d.heightProfile;
+  if (heightData && heightData.length > 0) {
+    html += '<div class="height-profile"><div class="height-profile-title">📊 Höhenprofil</div><div class="height-bars">';
+    heightData.forEach(p => {
+      const pct = Math.max(8, (p.height / (p.max || 2000)) * 100);
+      const cls = p.height > 1800 ? 'high' : p.height > 1000 ? 'mid' : 'low';
+      html += `<div class="height-bar ${cls}" style="height:${pct}%" title="${p.label}: ${p.height}m"></div>`;
+    });
+    html += '</div><div class="height-labels">';
+    heightData.forEach(p => {
+      html += `<div class="height-label">${p.label}</div>`;
+    });
+    html += '</div></div>';
+  }
+  // Bug-Fix: countryInfo UND countries_detail beide unterstützen
+  const countries = d.countryInfo || d.countries_detail || [];
+  if (countries.length > 0) {
+    html += '<div class="countries-bar">';
+    countries.forEach(c => {
+      html += `<div class="country-chip"><span class="flag">${c.flag}</span><span>${c.name}</span><span class="maut">${c.maut || ''}</span></div>`;
+    });
+    html += '</div>';
+  }
   return html;
 }
 
