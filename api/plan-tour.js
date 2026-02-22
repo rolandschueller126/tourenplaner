@@ -47,15 +47,15 @@ Format:
           "duration": "45 min Pause",
           "desc": "Warum man hier halten sollte.",
           "tips": [
-            { "type": "insider", "text": "Konkreter Tipp", "links": ["Google Maps:https://maps.google.com/?q=Ortsname", "Wikipedia:https://de.wikipedia.org/wiki/Ortsname"] },
-            { "type": "einkehr", "text": "Restaurant-Empfehlung", "links": ["Google Maps:https://maps.google.com/?q=Restaurant+Ortsname"] }
+            { "type": "insider", "tag": "insider", "text": "Konkreter Tipp", "links": ["Google Maps:https://maps.google.com/?q=Ortsname", "Wikipedia:https://de.wikipedia.org/wiki/Ortsname"] },
+            { "type": "einkehr", "tag": "einkehr", "text": "Restaurant-Empfehlung", "links": ["Google Maps:https://maps.google.com/?q=Restaurant+Ortsname"] }
           ]
         }
       ],
       "hints": [
-        { "icon": "⛽", "title": "Tankstopp", "text": "Details", "severity": "info" }
+        { "icon": "⛽", "title": "Tankstopp", "text": "Details", "severity": "info", "tag": "fuel" }
       ],
-      "countries_detail": [
+      "countryInfo": [
         { "flag": "🇩🇪", "name": "Deutschland", "maut": "Keine Maut" }
       ]
     }
@@ -73,10 +73,14 @@ REGELN:
 - Echte Ortsnamen und echte GPS-Koordinaten (lng/lat)
 - Echte Google Maps und Wikipedia Links
 - 3-5 Stops pro Tag mit je 2-3 Tips
-- 3-5 Hints pro Tag
+- JEDER tip MUSS sowohl "type" ALS AUCH "tag" haben (gleicher Wert)
+- 3-5 Hints pro Tag, jeder hint MUSS "tag" haben
+- tag-Werte für tips: "insider", "foto-spot", "einkehr", "kultur", "natur", "warnung"
+- tag-Werte für hints: "fuel", "warn", "danger", "info"
 - Realistisches Budget
+- km und Fahrzeit realistisch schätzen (keine Luftlinie, echte Straßen)
 - severity: "info", "warnung" oder "achtung"
-- tip types: "insider", "foto-spot", "einkehr", "kultur", "natur", "warnung"`;
+- countryInfo (nicht countries_detail) für Länder-Chips`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
